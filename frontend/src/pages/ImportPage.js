@@ -533,13 +533,6 @@ const ImportPage = () => {
             </div>
           </div>
         </div>
-          </div>
-        )}
-
-        {/* LottieFiles Tab */}
-        {activeTab === 'lottiefiles' && (
-          <LottieFilesBrowser onImport={handleLottieFilesImport} />
-        )}
       </div>
     </div>
   );
