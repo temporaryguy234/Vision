@@ -370,7 +370,7 @@ async def seed_database():
     
     # Insert templates
     for template in templates:
-        await db.templates.insert_one(template.dict())
+        await db.templates.insert_one(template.model_dump())
     
     print(f"✅ Seeded {len(templates)} templates with comprehensive schemas")
     
