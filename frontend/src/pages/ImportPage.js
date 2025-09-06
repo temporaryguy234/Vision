@@ -193,9 +193,12 @@ const ImportPage = () => {
                 Supports Lottie JSON, MP4, GIF, and other motion graphics formats
               </p>
               
-              <button className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200">
+              <button 
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isUploading}
+              >
                 <Upload className="w-5 h-5 mr-2" />
-                Choose Files
+                {isUploading ? 'Uploading...' : 'Choose Files'}
               </button>
             </div>
           </div>
