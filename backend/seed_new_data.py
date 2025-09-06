@@ -466,7 +466,7 @@ async def seed_database():
     
     # Insert template assets
     for asset in template_assets:
-        await db.template_assets.insert_one(asset.dict())
+        await db.template_assets.insert_one(asset.model_dump())
     
     print(f"✅ Seeded {len(template_assets)} template assets")
     
