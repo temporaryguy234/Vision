@@ -231,7 +231,7 @@ async def create_template(template: TemplateCreate):
     slug = create_slug(template.title)
     unique_slug = await ensure_unique_slug(slug)
     
-    template_dict = template.dict()
+    template_dict = template.model_dump()
     template_dict["slug"] = unique_slug
     
     template_obj = Template(**template_dict)
