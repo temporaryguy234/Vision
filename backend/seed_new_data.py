@@ -602,7 +602,7 @@ async def seed_database():
     
     # Insert brand kits
     for brand_kit in brand_kits:
-        await db.brand_kits.insert_one(brand_kit.dict())
+        await db.brand_kits.insert_one(brand_kit.model_dump())
     
     print(f"✅ Seeded {len(brand_kits)} brand kits")
     
