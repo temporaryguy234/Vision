@@ -304,7 +304,7 @@ async def seed_database():
     await db.exports.insert_many(exports)
     print(f"✅ Seeded {len(exports)} exports")
     
-    await client.close()
+    client.close()
     print("🎉 Database seeding completed successfully!")
 
 if __name__ == "__main__":
