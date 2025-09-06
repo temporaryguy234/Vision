@@ -115,56 +115,73 @@ const TemplatesPage = () => {
             ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
             : 'grid-cols-1'
         }`}>
-          {filteredTemplates.map((template) => (
-            <Link
-              key={template.id}
-              to={`/editor/${template.id}`}
-              className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
-            >
-              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                <img
-                  src={template.preview}
-                  alt={template.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <span className="text-sm font-medium">{template.duration}</span>
+          {loading ? (
+            // Loading skeletons
+            Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="bg-white rounded-2xl shadow-lg overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-200"></div>
+                <div className="p-6">
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                  <div className="flex gap-2">
+                    <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+                    <div className="h-6 bg-gray-200 rounded-full w-20"></div>
                   </div>
                 </div>
               </div>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-orange-600 font-medium">{template.category}</span>
-                  {template.isPublic && (
-                    <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Public</span>
-                  )}
+            ))
+          ) : (
+            filteredTemplates.map((template) => (
+              <Link
+                key={template.id}
+                to={`/editor/${template.id}`}
+                className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
+              >
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                  <img
+                    src={template.preview}
+                    alt={template.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute bottom-4 left-4 text-white">
+                      <span className="text-sm font-medium">{template.duration}</span>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">{template.title}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {template.tags.slice(0, 3).map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {template.tags.length > 3 && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                      +{template.tags.length - 3}
-                    </span>
-                  )}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-orange-600 font-medium">{template.category}</span>
+                    {template.is_public && (
+                      <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Public</span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">{template.title}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {template.tags.slice(0, 3).map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {template.tags.length > 3 && (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                        +{template.tags.length - 3}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))
+          )}
         </div>
 
         {/* Results Info */}
         <div className="mt-8 text-center">
           <p className="text-gray-600">
-            Showing {filteredTemplates.length} of {templates.length} templates
+            {loading ? 'Loading templates...' : `Showing ${filteredTemplates.length} templates`}
           </p>
         </div>
       </div>
