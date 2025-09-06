@@ -820,6 +820,174 @@ async def bulk_import_create_templates(
         }
     }
 
+# LottieFiles Integration Routes
+@api_router.get("/lottiefiles/search")
+async def search_lottiefiles_animations(
+    query: Optional[str] = Query(None, description="Search query"),
+    category: Optional[str] = Query(None, description="Animation category"),
+    limit: int = Query(20, ge=1, le=100, description="Results per page")
+):
+    """Search LottieFiles animations with filtering options."""
+    try:
+        results = await lottiefiles_service.search_animations(query, category, limit)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@api_router.get("/lottiefiles/animation/{animation_id}")
+async def get_lottiefiles_animation_details(animation_id: str):
+    """Get detailed information about a specific LottieFiles animation."""
+    try:
+        animation = await lottiefiles_service.get_animation_details(animation_id)
+        if not animation:
+            raise HTTPException(status_code=404, detail="Animation not found")
+        return animation.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get animation details: {str(e)}")
+
+@api_router.get("/lottiefiles/popular")
+async def get_popular_lottiefiles_animations(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    limit: int = Query(6, ge=1, le=50, description="Number of results")
+):
+    """Get popular LottieFiles animations, optionally filtered by category."""
+    try:
+        animations = await lottiefiles_service.get_popular_animations(category, limit)
+        return animations
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get popular animations: {str(e)}")
+
+@api_router.get("/lottiefiles/categories")
+async def get_lottiefiles_categories():
+    """Get available LottieFiles animation categories."""
+    try:
+        categories = await lottiefiles_service.get_categories()
+        return categories
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get categories: {str(e)}")
+
+@api_router.post("/lottiefiles/import/{animation_id}")
+async def import_lottiefiles_animation(
+    animation_id: str,
+    target_category: Optional[str] = Query(None, description="Target category for import")
+):
+    """Import a LottieFiles animation into the local library."""
+    try:
+        # Get animation details
+        animation = await lottiefiles_service.get_animation_details(animation_id)
+        if not animation:
+            raise HTTPException(status_code=404, detail="Animation not found")
+        
+        # Download animation data
+        animation_data = await lottiefiles_service.download_animation(animation.file_url)
+        if not animation_data:
+            raise HTTPException(status_code=400, detail="Failed to download animation data")
+        
+        # Determine category
+        category = target_category or animation.category or "imported"
+        
+        # Create template from animation
+        template_data = {
+            "title": animation.name,
+            "category": TemplateCategory.MISCELLANEOUS,  # Map to proper category later
+            "tags": animation.tags,
+            "preview_image_url": animation.thumbnail_url or "https://placeholder.com/400x300",
+            "creator_id": "lottiefiles_import",
+            "is_public": True,
+            "editable_parameters_schema": {
+                "canvas": {
+                    "width": animation.dimensions.get("width", 400),
+                    "height": animation.dimensions.get("height", 400),
+                    "background_color": "transparent",
+                    "global_playback_speed": 1.0
+                },
+                "elements": [
+                    {
+                        "id": "lottie_main",
+                        "type": "lottie",
+                        "name": animation.name,
+                        "parameters": {
+                            "source_url": animation.file_url,
+                            "loop": True,
+                            "autoplay": True,
+                            "speed": 1.0,
+                            "opacity": 1.0,
+                            "x": 50.0,
+                            "y": 50.0,
+                            "scale": 1.0,
+                            "rotation": 0.0
+                        }
+                    }
+                ]
+            }
+        }
+        
+        # Map category properly
+        category_mapping = {
+            "loading": TemplateCategory.ANIMATED_ICONS,
+            "success": TemplateCategory.ANIMATED_ICONS,
+            "business": TemplateCategory.ADS_PROMOS,
+            "technology": TemplateCategory.ADS_PROMOS,
+            "education": TemplateCategory.TITLES_QUOTES,
+            "social": TemplateCategory.SOCIAL_MEDIA,
+            "entertainment": TemplateCategory.MISCELLANEOUS,
+            "healthcare": TemplateCategory.ADS_PROMOS,
+        }
+        template_data["category"] = category_mapping.get(animation.category, TemplateCategory.MISCELLANEOUS)
+        
+        # Validate and create template
+        template_create = TemplateCreate(**template_data)
+        validation_errors = validator.validate_editable_parameters(template_create.editable_parameters_schema)
+        
+        if validation_errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid template parameters",
+                    "errors": validation_errors
+                }
+            )
+        
+        # Create slug
+        slug = create_slug(template_create.title)
+        unique_slug = await ensure_unique_slug(slug)
+        
+        template_dict = template_create.model_dump()
+        template_dict["slug"] = unique_slug
+        
+        template_obj = Template(**template_dict)
+        await db.templates.insert_one(template_obj.model_dump())
+        
+        # Create template asset record
+        asset_data = {
+            "template_id": template_obj.id,
+            "asset_type": AssetType.LOTTIE_JSON,
+            "file_url": animation.file_url,
+            "width": animation.dimensions.get("width"),
+            "height": animation.dimensions.get("height"),
+            "duration": animation.duration,
+            "frame_rate": 30,  # Default for Lottie
+            "file_size": animation.file_size or 0
+        }
+        
+        asset_obj = TemplateAsset(**asset_data)
+        await db.template_assets.insert_one(asset_obj.model_dump())
+        
+        return {
+            "message": "Animation imported successfully",
+            "template_id": template_obj.id,
+            "template_slug": template_obj.slug,
+            "template_title": template_obj.title,
+            "category": template_obj.category.value
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 # Include the router in the main app
 app.include_router(api_router)
 
