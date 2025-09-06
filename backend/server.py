@@ -236,7 +236,7 @@ async def create_template(template: TemplateCreate):
     
     template_obj = Template(**template_dict)
     
-    await db.templates.insert_one(template_obj.dict())
+    await db.templates.insert_one(template_obj.model_dump())
     return template_obj
 
 @api_router.get("/templates/{template_id}", response_model=Template)
