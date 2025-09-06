@@ -97,19 +97,19 @@ const ExplorePage = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="px-8 py-16 bg-white/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+      {/* Stats Section - Compact */}
+      <section className="px-8 py-8 bg-white/30 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {stats.map((stat, index) => {
               const Icon = stat.icon;
               return (
                 <div key={index} className="text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-gray-50 to-white rounded-2xl shadow-lg mb-4">
-                    <Icon className={`w-8 h-8 ${stat.color}`} />
+                  <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-r from-gray-50 to-white rounded-xl shadow-md mb-2">
+                    <Icon className={`w-5 h-5 ${stat.color}`} />
                   </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-2">{stat.value}</div>
-                  <div className="text-gray-600 font-medium">{stat.label}</div>
+                  <div className="text-xl font-bold text-gray-900 mb-1">{stat.value}</div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
                 </div>
               );
             })}
