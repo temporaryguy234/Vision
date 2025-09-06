@@ -778,16 +778,20 @@ async def bulk_import_create_templates(
                 "template_id": template_obj.id,
                 "asset_type": AssetType(item.get("asset_type")),
                 "file_url": item.get("file_url"),
-                "width": item.get("metadata", {}).get("width"),
-                "height": item.get("metadata", {}).get("height"),
-                "duration": item.get("metadata", {}).get("duration"),
-                "frame_rate": item.get("metadata", {}).get("frame_rate"),
                 "file_size": item.get("metadata", {}).get("file_size", 0),
                 "file_hash": item.get("file_hash")
             }
             
-            # Remove None values
-            asset_data = {k: v for k, v in asset_data.items() if v is not None}
+            # Add optional fields only if they exist
+            metadata = item.get("metadata", {})
+            if "width" in metadata:
+                asset_data["width"] = metadata["width"]
+            if "height" in metadata:
+                asset_data["height"] = metadata["height"]
+            if "duration" in metadata:
+                asset_data["duration"] = metadata["duration"]
+            if "frame_rate" in metadata:
+                asset_data["frame_rate"] = metadata["frame_rate"]
             
             asset_obj = TemplateAsset(**asset_data)
             await db.template_assets.insert_one(asset_obj.model_dump())
