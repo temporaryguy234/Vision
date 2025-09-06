@@ -313,6 +313,7 @@ class TemplateAssetCreate(BaseModel):
     duration: Optional[float] = Field(ge=0.0)
     frame_rate: Optional[int] = Field(ge=1, le=120)
     file_size: int = Field(ge=0)
+    file_hash: Optional[str]
 
 class ProjectCreate(BaseModel):
     template_id: str
