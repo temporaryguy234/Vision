@@ -154,6 +154,8 @@ class FileStorageManager:
         Returns:
             Tuple of (file_url, asset_type, metadata)
         """
+        import hashlib
+        
         # Determine asset type
         asset_type = self._get_asset_type_from_file(file.filename, file.content_type)
         if not asset_type:
@@ -173,17 +175,19 @@ class FileStorageManager:
         
         file_path = save_dir / unique_filename
         
-        # Save file
+        # Save file and calculate hash
         try:
+            content = await file.read()
+            file_size = len(content)
+            file_hash = hashlib.md5(content).hexdigest()
+            
             async with aiofiles.open(file_path, 'wb') as f:
-                content = await file.read()
                 await f.write(content)
-                file_size = len(content)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
         
         # Get file metadata based on asset type
-        metadata = {'file_size': file_size}
+        metadata = {'file_size': file_size, 'file_hash': file_hash}
         
         if asset_type == AssetType.LOTTIE_JSON:
             # Validate Lottie file
