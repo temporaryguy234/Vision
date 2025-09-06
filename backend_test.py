@@ -610,46 +610,68 @@ def main():
     
     tester = MotionEditAPITester()
     
-    # Test basic endpoints
-    print("\n📡 BASIC API TESTS")
-    print("-" * 30)
-    tester.test_root_endpoint()
-    tester.test_get_stats()
+    # Create test files for bulk import testing
+    tester.create_test_files()
     
-    # Test template endpoints
-    print("\n📋 TEMPLATE TESTS")
-    print("-" * 30)
-    tester.test_get_templates()
-    tester.test_search_templates()
-    tester.test_filter_templates_by_category()
-    
-    # Create a template and test retrieval
-    success, template_data = tester.test_create_template()
-    if success and 'id' in template_data:
-        tester.test_get_template_by_id(template_data['id'])
-    
-    # Test project endpoints
-    print("\n📁 PROJECT TESTS")
-    print("-" * 30)
-    tester.test_create_project()
-    tester.test_get_projects()
-    
-    # Test natural language commands
-    print("\n🗣️  NATURAL LANGUAGE TESTS")
-    print("-" * 30)
-    tester.test_natural_language_commands()
-    
-    # Test export endpoints
-    print("\n📤 EXPORT TESTS")
-    print("-" * 30)
-    tester.test_create_export()
-    tester.test_get_exports()
-    
-    # Test brand kit endpoints
-    print("\n🎨 BRAND KIT TESTS")
-    print("-" * 30)
-    tester.test_create_brand_kit()
-    tester.test_get_brand_kits()
+    try:
+        # Test basic endpoints
+        print("\n📡 BASIC API TESTS")
+        print("-" * 30)
+        tester.test_root_endpoint()
+        tester.test_get_stats()
+        
+        # Test template endpoints
+        print("\n📋 TEMPLATE TESTS")
+        print("-" * 30)
+        tester.test_get_templates()
+        tester.test_search_templates()
+        tester.test_filter_templates_by_category()
+        
+        # Create a template and test retrieval
+        success, template_data = tester.test_create_template()
+        if success and 'id' in template_data:
+            tester.test_get_template_by_id(template_data['id'])
+        
+        # Test LOTTIE element validation
+        print("\n🎭 LOTTIE ELEMENT TESTS")
+        print("-" * 30)
+        tester.test_lottie_element_validation()
+        tester.test_lottie_element_invalid_parameters()
+        
+        # Test bulk import functionality
+        print("\n📦 BULK IMPORT TESTS")
+        print("-" * 30)
+        tester.test_bulk_import_upload_valid_files()
+        tester.test_bulk_import_upload_invalid_files()
+        tester.test_bulk_import_duplicate_detection()
+        tester.test_bulk_import_create_templates()
+        
+        # Test project endpoints
+        print("\n📁 PROJECT TESTS")
+        print("-" * 30)
+        tester.test_create_project()
+        tester.test_get_projects()
+        
+        # Test natural language commands
+        print("\n🗣️  NATURAL LANGUAGE TESTS")
+        print("-" * 30)
+        tester.test_natural_language_commands()
+        
+        # Test export endpoints
+        print("\n📤 EXPORT TESTS")
+        print("-" * 30)
+        tester.test_create_export()
+        tester.test_get_exports()
+        
+        # Test brand kit endpoints
+        print("\n🎨 BRAND KIT TESTS")
+        print("-" * 30)
+        tester.test_create_brand_kit()
+        tester.test_get_brand_kits()
+        
+    finally:
+        # Clean up test files
+        tester.cleanup_test_files()
     
     # Print final results
     print("\n" + "=" * 60)
