@@ -483,7 +483,7 @@ async def create_brand_kit(brand_kit: BrandKitCreate):
 @api_router.put("/brand-kits/{kit_id}", response_model=BrandKit)
 async def update_brand_kit(kit_id: str, brand_kit_update: BrandKitUpdate):
     """Update a brand kit"""
-    update_data = {k: v for k, v in brand_kit_update.dict().items() if v is not None}
+    update_data = {k: v for k, v in brand_kit_update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.utcnow()
     
     result = await db.brand_kits.update_one(
