@@ -332,7 +332,7 @@ async def create_template_asset(template_id: str, asset: TemplateAssetCreate):
     asset_dict = asset.dict()
     asset_obj = TemplateAsset(**asset_dict)
     
-    await db.template_assets.insert_one(asset_obj.dict())
+    await db.template_assets.insert_one(asset_obj.model_dump())
     return asset_obj
 
 @api_router.post("/templates/{template_id}/upload-asset", response_model=TemplateAsset)
