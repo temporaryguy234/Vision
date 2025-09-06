@@ -860,6 +860,21 @@ def main():
         tester.test_create_brand_kit()
         tester.test_get_brand_kits()
         
+        # Test LottieFiles integration endpoints
+        print("\n🎭 LOTTIEFILES INTEGRATION TESTS")
+        print("-" * 30)
+        tester.test_lottiefiles_search_no_params()
+        tester.test_lottiefiles_search_with_query()
+        tester.test_lottiefiles_search_with_category()
+        tester.test_lottiefiles_categories()
+        tester.test_lottiefiles_popular()
+        tester.test_lottiefiles_popular_with_category()
+        tester.test_lottiefiles_animation_details_valid()
+        tester.test_lottiefiles_animation_details_invalid()
+        tester.test_lottiefiles_import_animation()
+        tester.test_lottiefiles_import_invalid_animation()
+        tester.test_lottiefiles_import_with_category()
+        
     finally:
         # Clean up test files
         tester.cleanup_test_files()
