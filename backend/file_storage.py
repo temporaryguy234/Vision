@@ -32,8 +32,10 @@ class FileStorageManager:
     def _get_asset_type_from_file(self, filename: str, content_type: str) -> Optional[AssetType]:
         """Determine asset type from filename and content type"""
         extension = Path(filename).suffix.lower()
+        filename_lower = filename.lower()
         
-        if extension == '.json' and 'lottie' in filename.lower():
+        # Check for Lottie JSON files - can be .json or .lottie extensions
+        if (extension == '.json' and ('lottie' in filename_lower or 'bodymovin' in filename_lower)) or extension == '.lottie':
             return AssetType.LOTTIE_JSON
         elif extension == '.mp4':
             return AssetType.MP4
@@ -45,6 +47,9 @@ class FileStorageManager:
             return AssetType.PNG
         elif extension == '.svg':
             return AssetType.SVG
+        # Also check for plain JSON files and validate if they're Lottie
+        elif extension == '.json':
+            return AssetType.LOTTIE_JSON  # We'll validate in save_uploaded_file
         
         return None
     
