@@ -182,7 +182,8 @@ class EditableElement(BaseModel):
         ImageElementParameters, 
         ShapeElementParameters,
         ChartElementParameters,
-        MapElementParameters
+        MapElementParameters,
+        LottieElementParameters
     ]
 
 class EditableParametersSchema(BaseModel):
