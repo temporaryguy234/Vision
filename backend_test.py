@@ -604,6 +604,10 @@ class MotionEditAPITester:
         
         return success
 
+    def test_get_brand_kits(self):
+        """Test getting brand kits for a user"""
+        return self.run_test("Get Brand Kits", "GET", "brand-kits", 200, params={"user_id": "test_user_123"})
+
 def main():
     print("🚀 Starting MotionEdit API Testing...")
     print("=" * 60)
