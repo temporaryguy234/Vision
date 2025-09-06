@@ -421,12 +421,12 @@ async def create_project(project: ProjectCreate):
     for element in template["editable_parameters_schema"]["elements"]:
         initial_state["elements"][element["id"]] = element["parameters"]
     
-    project_dict = project.dict()
+    project_dict = project.model_dump()
     project_dict["current_editor_state"] = initial_state
     
     project_obj = Project(**project_dict)
     
-    await db.projects.insert_one(project_obj.dict())
+    await db.projects.insert_one(project_obj.model_dump())
     return project_obj
 
 @api_router.get("/projects/{project_id}", response_model=Project)
