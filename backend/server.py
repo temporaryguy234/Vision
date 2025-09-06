@@ -16,6 +16,7 @@ import uuid
 # Import our models and file storage
 from models import *
 from file_storage import file_storage
+from lottiefiles import lottiefiles_service
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
