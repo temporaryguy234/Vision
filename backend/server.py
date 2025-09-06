@@ -263,7 +263,7 @@ async def update_template(template_id: str, template_update: TemplateUpdate):
     if not existing_template:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    update_data = {k: v for k, v in template_update.dict().items() if v is not None}
+    update_data = {k: v for k, v in template_update.model_dump().items() if v is not None}
     
     # Validate editable parameters if provided
     if "editable_parameters_schema" in update_data:
