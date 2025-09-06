@@ -608,6 +608,193 @@ class MotionEditAPITester:
         """Test getting brand kits for a user"""
         return self.run_test("Get Brand Kits", "GET", "brand-kits", 200, params={"user_id": "test_user_123"})
 
+    # LottieFiles Integration Tests
+    def test_lottiefiles_search_no_params(self):
+        """Test LottieFiles search without parameters (curated animations)"""
+        success, data = self.run_test("LottieFiles Search (No Params)", "GET", "lottiefiles/search", 200)
+        if success:
+            results = data.get('results', [])
+            print(f"   🎭 Found {len(results)} curated animations")
+            if results:
+                first_anim = results[0]
+                required_fields = ['id', 'name', 'category', 'file_url', 'tags']
+                missing_fields = [field for field in required_fields if field not in first_anim]
+                if missing_fields:
+                    print(f"   ⚠️  Animation missing fields: {missing_fields}")
+                else:
+                    print(f"   ✅ Animation structure valid: {first_anim['name']} ({first_anim['category']})")
+        return success
+
+    def test_lottiefiles_search_with_query(self):
+        """Test LottieFiles search with query parameter"""
+        success, data = self.run_test("LottieFiles Search (Query: loading)", "GET", "lottiefiles/search", 200, 
+                                    params={"query": "loading"})
+        if success:
+            results = data.get('results', [])
+            print(f"   🔍 Found {len(results)} animations matching 'loading'")
+            # Verify results contain loading-related animations
+            loading_found = any('loading' in anim.get('name', '').lower() or 
+                              'loading' in anim.get('tags', []) for anim in results)
+            if loading_found:
+                print(f"   ✅ Search filtering working correctly")
+            else:
+                print(f"   ⚠️  Search results may not be properly filtered")
+        return success
+
+    def test_lottiefiles_search_with_category(self):
+        """Test LottieFiles search with category filter"""
+        success, data = self.run_test("LottieFiles Search (Category: business)", "GET", "lottiefiles/search", 200,
+                                    params={"category": "business"})
+        if success:
+            results = data.get('results', [])
+            print(f"   📊 Found {len(results)} business animations")
+            # Verify all results are in business category
+            if results:
+                business_only = all(anim.get('category', '').lower() == 'business' for anim in results)
+                if business_only:
+                    print(f"   ✅ Category filtering working correctly")
+                else:
+                    print(f"   ⚠️  Category filtering may not be working properly")
+        return success
+
+    def test_lottiefiles_categories(self):
+        """Test getting LottieFiles categories"""
+        success, data = self.run_test("LottieFiles Categories", "GET", "lottiefiles/categories", 200)
+        if success:
+            print(f"   📂 Found {len(data)} categories")
+            if data:
+                first_category = data[0]
+                required_fields = ['slug', 'name', 'description']
+                missing_fields = [field for field in required_fields if field not in first_category]
+                if missing_fields:
+                    print(f"   ⚠️  Category missing fields: {missing_fields}")
+                else:
+                    print(f"   ✅ Category structure valid")
+                    for category in data[:3]:  # Show first 3 categories
+                        print(f"   - {category['name']}: {category['description']}")
+        return success
+
+    def test_lottiefiles_popular(self):
+        """Test getting popular LottieFiles animations"""
+        success, data = self.run_test("LottieFiles Popular", "GET", "lottiefiles/popular", 200)
+        if success:
+            print(f"   ⭐ Found {len(data)} popular animations")
+            if data:
+                for anim in data[:2]:  # Show first 2 animations
+                    print(f"   - {anim.get('name')} ({anim.get('category')})")
+        return success
+
+    def test_lottiefiles_popular_with_category(self):
+        """Test getting popular animations with category filter"""
+        success, data = self.run_test("LottieFiles Popular (Category: technology)", "GET", "lottiefiles/popular", 200,
+                                    params={"category": "technology"})
+        if success:
+            print(f"   💻 Found {len(data)} popular technology animations")
+            if data:
+                tech_only = all(anim.get('category', '').lower() == 'technology' for anim in data)
+                if tech_only:
+                    print(f"   ✅ Category filtering in popular animations working")
+                else:
+                    print(f"   ⚠️  Category filtering in popular animations may not be working")
+        return success
+
+    def test_lottiefiles_animation_details_valid(self):
+        """Test getting details for a specific LottieFiles animation"""
+        # Use a known animation ID from curated list
+        animation_id = "loading_spinner"
+        success, data = self.run_test(f"LottieFiles Animation Details ({animation_id})", "GET", 
+                                    f"lottiefiles/animation/{animation_id}", 200)
+        if success:
+            required_fields = ['id', 'name', 'description', 'category', 'file_url', 'dimensions']
+            missing_fields = [field for field in required_fields if field not in data]
+            if missing_fields:
+                print(f"   ⚠️  Animation details missing fields: {missing_fields}")
+            else:
+                print(f"   ✅ Animation details complete")
+                print(f"   - Name: {data.get('name')}")
+                print(f"   - Category: {data.get('category')}")
+                print(f"   - Duration: {data.get('duration')}s")
+                print(f"   - Dimensions: {data.get('dimensions')}")
+        return success
+
+    def test_lottiefiles_animation_details_invalid(self):
+        """Test getting details for invalid animation ID"""
+        invalid_id = "nonexistent_animation_id"
+        success, data = self.run_test(f"LottieFiles Animation Details (Invalid ID)", "GET", 
+                                    f"lottiefiles/animation/{invalid_id}", 404)
+        if success:
+            print(f"   ✅ Properly returns 404 for invalid animation ID")
+        return success
+
+    def test_lottiefiles_import_animation(self):
+        """Test importing a LottieFiles animation to create template"""
+        # Use a known animation ID from curated list
+        animation_id = "success_checkmark"
+        success, data = self.run_test(f"LottieFiles Import Animation ({animation_id})", "POST", 
+                                    f"lottiefiles/import/{animation_id}", 200)
+        if success:
+            required_fields = ['message', 'template_id', 'template_slug', 'template_title', 'category']
+            missing_fields = [field for field in required_fields if field not in data]
+            if missing_fields:
+                print(f"   ⚠️  Import response missing fields: {missing_fields}")
+            else:
+                print(f"   ✅ Animation imported successfully")
+                print(f"   - Template ID: {data.get('template_id')}")
+                print(f"   - Template Title: {data.get('template_title')}")
+                print(f"   - Template Slug: {data.get('template_slug')}")
+                print(f"   - Category: {data.get('category')}")
+                
+                # Store template ID for cleanup
+                if 'template_id' in data:
+                    self.created_resources.append(data['template_id'])
+                
+                # Verify the template was actually created by trying to fetch it
+                template_id = data.get('template_id')
+                if template_id:
+                    verify_success, template_data = self.run_test(f"Verify Imported Template", "GET", 
+                                                                f"templates/{template_id}", 200)
+                    if verify_success:
+                        print(f"   ✅ Imported template verified in database")
+                        # Check if it has LOTTIE element
+                        elements = template_data.get('editable_parameters_schema', {}).get('elements', [])
+                        lottie_elements = [elem for elem in elements if elem.get('type') == 'lottie']
+                        if lottie_elements:
+                            print(f"   ✅ Template contains {len(lottie_elements)} LOTTIE element(s)")
+                            lottie_elem = lottie_elements[0]
+                            params = lottie_elem.get('parameters', {})
+                            print(f"   - Source URL: {params.get('source_url')}")
+                            print(f"   - Loop: {params.get('loop')}")
+                            print(f"   - Autoplay: {params.get('autoplay')}")
+                        else:
+                            print(f"   ⚠️  Template missing LOTTIE elements")
+                    else:
+                        print(f"   ❌ Could not verify imported template in database")
+        return success
+
+    def test_lottiefiles_import_invalid_animation(self):
+        """Test importing invalid animation ID"""
+        invalid_id = "nonexistent_animation_for_import"
+        success, data = self.run_test(f"LottieFiles Import Invalid Animation", "POST", 
+                                    f"lottiefiles/import/{invalid_id}", 404)
+        if success:
+            print(f"   ✅ Properly returns 404 for invalid animation import")
+        return success
+
+    def test_lottiefiles_import_with_category(self):
+        """Test importing animation with target category"""
+        animation_id = "business_growth"
+        success, data = self.run_test(f"LottieFiles Import with Category", "POST", 
+                                    f"lottiefiles/import/{animation_id}", 200,
+                                    params={"target_category": "business"})
+        if success:
+            print(f"   ✅ Animation imported with target category")
+            print(f"   - Final Category: {data.get('category')}")
+            
+            # Store template ID for cleanup
+            if 'template_id' in data:
+                self.created_resources.append(data['template_id'])
+        return success
+
 def main():
     print("🚀 Starting MotionEdit API Testing...")
     print("=" * 60)
