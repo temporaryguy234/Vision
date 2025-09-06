@@ -688,7 +688,7 @@ async def bulk_import_create_templates(
                 "title": item.get("title", f"Imported Template {len(templates_created) + 1}"),
                 "category": TemplateCategory(item.get("category", "MISCELLANEOUS")),
                 "tags": item.get("tags", []),
-                "preview_image_url": item.get("thumbnail_url", ""),
+                "preview_image_url": item.get("thumbnail_url") or item.get("preview_image_url", "https://placeholder.com/300x200"),
                 "creator_id": item.get("creator_id", "bulk_import"),
                 "is_public": item.get("is_public", True)
             }
