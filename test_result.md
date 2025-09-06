@@ -101,3 +101,98 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: Implement bulk template import feature and integrate Lottie preview in the editor. The bulk import should handle Lottie JSON files and Adobe After Effects exports (via Bodymovin), with metadata detection, asset generation, guided wizard, and duplicate handling. The Lottie preview should natively render Lottie JSON in the editor canvas.
+
+backend:
+  - task: "Create bulk import API endpoints"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Planning phase - need to create endpoints for bulk file upload and processing"
+
+  - task: "Implement Lottie JSON metadata extraction"
+    implemented: false
+    working: "NA"
+    file: "file_storage.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Need to extract metadata from Lottie JSON files including dimensions, duration, frame rate"
+
+  - task: "Add duplicate detection logic"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Implement duplicate detection based on file hash or metadata"
+
+frontend:
+  - task: "Install and configure Lottie React library"
+    implemented: false
+    working: "NA"
+    file: "package.json"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Need to research and install best Lottie library for React"
+
+  - task: "Update Canvas component for Lottie rendering"
+    implemented: false
+    working: "NA"
+    file: "components/editor/Canvas.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Modify Canvas to handle both Lottie JSON and other formats"
+
+  - task: "Create bulk import wizard UI"
+    implemented: false
+    working: "NA"
+    file: "pages/ImportPage.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Build guided wizard for bulk template import with drag-drop and metadata input"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Install and configure Lottie React library"
+    - "Create bulk import API endpoints"
+    - "Implement Lottie JSON metadata extraction"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+    - message: "Starting implementation of bulk template import and Lottie preview integration. Will begin with Lottie library installation and basic backend endpoints."
