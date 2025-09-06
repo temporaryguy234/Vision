@@ -440,7 +440,7 @@ async def get_project(project_id: str):
 @api_router.put("/projects/{project_id}", response_model=Project)
 async def update_project(project_id: str, project_update: ProjectUpdate):
     """Update project"""
-    update_data = {k: v for k, v in project_update.dict().items() if v is not None}
+    update_data = {k: v for k, v in project_update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.utcnow()
     
     result = await db.projects.update_one(
