@@ -57,7 +57,9 @@ logger = logging.getLogger(__name__)
 # Helper functions
 def create_slug(title: str) -> str:
     """Create a URL-friendly slug from title"""
-    slug = re.sub(r'[^\w\s-]', '', title.lower())
+    # Replace underscores and dots with hyphens, remove other special chars
+    slug = re.sub(r'[._]', '-', title.lower())
+    slug = re.sub(r'[^\w\s-]', '', slug)
     slug = re.sub(r'[-\s]+', '-', slug)
     return slug.strip('-')
 
