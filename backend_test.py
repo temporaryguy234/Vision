@@ -553,7 +553,7 @@ class MotionEditAPITester:
         # Create a template with invalid LOTTIE element parameters
         template_data = {
             "title": f"Invalid Lottie Test {datetime.now().strftime('%H%M%S')}",
-            "category": "MISCELLANEOUS",
+            "category": "Miscellaneous",
             "tags": ["lottie", "test", "invalid"],
             "preview_image_url": "https://placeholder.com/300x200",
             "creator_id": "test_lottie_invalid",
