@@ -607,6 +607,212 @@ async def get_stats():
         "avg_edit_time": "2 Min"
     }
 
+# Bulk Import Routes
+@api_router.post("/bulk-import/upload")
+async def bulk_import_upload(files: List[UploadFile] = File(...)):
+    """Upload multiple files for bulk template import"""
+    import hashlib
+    
+    results = []
+    
+    for file in files:
+        try:
+            # Calculate file hash for duplicate detection
+            content = await file.read()
+            file_hash = hashlib.md5(content).hexdigest()
+            
+            # Reset file pointer
+            await file.seek(0)
+            
+            # Check for duplicates based on hash
+            existing_asset = await db.template_assets.find_one({"file_hash": file_hash})
+            if existing_asset:
+                results.append({
+                    "filename": file.filename,
+                    "status": "duplicate",  
+                    "message": "File already exists",
+                    "existing_template_id": existing_asset.get("template_id")
+                })
+                continue
+            
+            try:
+                # Process file
+                file_url, asset_type, metadata = await file_storage.save_uploaded_file(file)
+                
+                # Generate thumbnail if possible
+                thumbnail_url = await file_storage.generate_thumbnail(file_url, asset_type)
+                
+                result = {
+                    "filename": file.filename,
+                    "status": "success",
+                    "file_url": file_url,
+                    "asset_type": asset_type.value,
+                    "metadata": metadata,
+                    "thumbnail_url": thumbnail_url,
+                    "file_hash": file_hash
+                }
+                
+                results.append(result)
+                
+            except HTTPException as e:
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "message": str(e.detail)
+                })
+                
+        except Exception as e:
+            results.append({
+                "filename": file.filename,
+                "status": "error", 
+                "message": f"Unexpected error: {str(e)}"
+            })
+    
+    return {"results": results}
+
+@api_router.post("/bulk-import/create-templates")
+async def bulk_import_create_templates(
+    import_data: Dict[str, Any]
+):
+    """Create templates from bulk import data"""
+    
+    templates_created = []
+    errors = []
+    
+    for item in import_data.get("items", []):
+        try:
+            # Extract template data
+            template_data = {
+                "title": item.get("title", f"Imported Template {len(templates_created) + 1}"),
+                "category": TemplateCategory(item.get("category", "MISCELLANEOUS")),
+                "tags": item.get("tags", []),
+                "preview_image_url": item.get("thumbnail_url", ""),
+                "creator_id": item.get("creator_id", "bulk_import"),
+                "is_public": item.get("is_public", True)
+            }
+            
+            # Create basic editable parameters schema
+            if item.get("asset_type") == "Lottie JSON":
+                # Create Lottie-based template
+                editable_parameters = {
+                    "canvas": {
+                        "width": item.get("metadata", {}).get("width", 800),
+                        "height": item.get("metadata", {}).get("height", 600),
+                        "background_color": "transparent",
+                        "global_playback_speed": 1.0
+                    },
+                    "elements": [
+                        {
+                            "id": "lottie_main",
+                            "type": "lottie",
+                            "name": "Main Animation",
+                            "parameters": {
+                                "source_url": item.get("file_url"),
+                                "loop": True,
+                                "autoplay": True,
+                                "speed": 1.0,
+                                "opacity": 1.0,
+                                "x": 50.0,
+                                "y": 50.0,
+                                "scale": 1.0,
+                                "rotation": 0.0
+                            }
+                        }
+                    ]
+                }
+            else:
+                # Create video/image-based template
+                editable_parameters = {
+                    "canvas": {
+                        "width": item.get("metadata", {}).get("width", 800),
+                        "height": item.get("metadata", {}).get("height", 600),
+                        "background_color": "#FFFFFF",
+                        "global_playback_speed": 1.0
+                    },
+                    "elements": [
+                        {
+                            "id": "media_main",
+                            "type": "image",
+                            "name": "Main Media",
+                            "parameters": {
+                                "source_url": item.get("file_url"),
+                                "fit": "cover",
+                                "opacity": 1.0,
+                                "x": 50.0,
+                                "y": 50.0,
+                                "scale": 1.0,
+                                "rotation": 0.0
+                            }
+                        }
+                    ]
+                }
+            
+            template_data["editable_parameters_schema"] = EditableParametersSchema(**editable_parameters)
+            
+            # Create template
+            template_create = TemplateCreate(**template_data)
+            
+            # Validate parameters
+            validation_errors = validator.validate_editable_parameters(template_create.editable_parameters_schema)
+            if validation_errors:
+                errors.append({
+                    "filename": item.get("filename"),
+                    "errors": validation_errors
+                })
+                continue
+            
+            # Create slug and ensure uniqueness
+            slug = create_slug(template_create.title)
+            unique_slug = await ensure_unique_slug(slug)
+            
+            template_dict = template_create.model_dump()
+            template_dict["slug"] = unique_slug
+            
+            template_obj = Template(**template_dict)
+            await db.templates.insert_one(template_obj.model_dump())
+            
+            # Create template asset record
+            asset_data = {
+                "template_id": template_obj.id,
+                "asset_type": AssetType(item.get("asset_type")),
+                "file_url": item.get("file_url"),
+                "width": item.get("metadata", {}).get("width"),
+                "height": item.get("metadata", {}).get("height"),
+                "duration": item.get("metadata", {}).get("duration"),
+                "frame_rate": item.get("metadata", {}).get("frame_rate"),
+                "file_size": item.get("metadata", {}).get("file_size", 0),
+                "file_hash": item.get("file_hash")
+            }
+            
+            # Remove None values
+            asset_data = {k: v for k, v in asset_data.items() if v is not None}
+            
+            asset_obj = TemplateAsset(**asset_data)
+            await db.template_assets.insert_one(asset_obj.model_dump())
+            
+            templates_created.append({
+                "template_id": template_obj.id,
+                "title": template_obj.title,
+                "slug": template_obj.slug,
+                "filename": item.get("filename")
+            })
+            
+        except Exception as e:
+            errors.append({
+                "filename": item.get("filename", "unknown"),
+                "error": str(e)
+            })
+    
+    return {
+        "templates_created": templates_created,
+        "errors": errors,
+        "summary": {
+            "total_processed": len(import_data.get("items", [])),
+            "successful": len(templates_created),
+            "failed": len(errors)
+        }
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
