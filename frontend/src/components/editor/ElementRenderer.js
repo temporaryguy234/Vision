@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart3, PieChart, TrendingUp, MapPin } from 'lucide-react';
+import LottieRenderer from './LottieRenderer';
 
 const ElementRenderer = ({ 
   element, 
