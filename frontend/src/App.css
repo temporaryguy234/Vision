@@ -149,3 +149,235 @@
 .animate-scaleIn {
   animation: scaleIn 0.3s ease-out;
 }
+
+/* Editor Element Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateX(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0);
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Editor specific styles */
+.editor-element {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.editor-element:hover {
+  cursor: move;
+}
+
+/* Selection handles */
+.selection-handle {
+  position: absolute;
+  background: #f97316;
+  border: 2px solid white;
+  border-radius: 4px;
+  width: 12px;
+  height: 12px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.selection-handle:hover {
+  background: #ea580c;
+  transform: scale(1.1);
+}
+
+/* Snap guides */
+.snap-guide {
+  position: absolute;
+  background: #f97316;
+  opacity: 0.6;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.snap-guide-x {
+  width: 1px;
+  height: 100%;
+}
+
+.snap-guide-y {
+  height: 1px;
+  width: 100%;
+}
+
+/* Canvas grid */
+.canvas-grid {
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Properties panel animations */
+.properties-section-enter {
+  opacity: 0;
+  max-height: 0;
+}
+
+.properties-section-enter-active {
+  opacity: 1;
+  max-height: 500px;
+  transition: opacity 200ms ease-in, max-height 200ms ease-in;
+}
+
+.properties-section-exit {
+  opacity: 1;
+  max-height: 500px;
+}
+
+.properties-section-exit-active {
+  opacity: 0;
+  max-height: 0;
+  transition: opacity 200ms ease-out, max-height 200ms ease-out;
+}
+
+/* Color picker custom styles */
+input[type="color"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
+/* Range slider custom styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Canvas responsive styles */
+@media (max-width: 768px) {
+  .editor-canvas {
+    transform-origin: top left;
+  }
+  
+  .properties-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+}
