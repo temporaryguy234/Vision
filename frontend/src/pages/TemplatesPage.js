@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Grid, List } from 'lucide-react';
+import { apiService } from '../services/api';
 
 const TemplatesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid');
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const categories = [
     'All',
@@ -20,87 +23,31 @@ const TemplatesPage = () => {
     'Miscellaneous'
   ];
 
-  const templates = [
-    {
-      id: 1,
-      title: 'Modern Social Intro',
-      category: 'Intros & Outros',
-      preview: 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=400&h=300&fit=crop',
-      tags: ['Instagram', 'TikTok', 'Modern', 'Trendy'],
-      duration: '5s',
-      isPublic: true
-    },
-    {
-      id: 2,
-      title: 'Data Chart Animation',
-      category: 'Charts & Maps',
-      preview: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop',
-      tags: ['Charts', 'Analytics', 'Business', 'Professional'],
-      duration: '8s',
-      isPublic: true
-    },
-    {
-      id: 3,
-      title: 'Logo Reveal',
-      category: 'Animated Icons',
-      preview: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=400&h=300&fit=crop',
-      tags: ['Logo', 'Branding', 'Corporate', 'Clean'],
-      duration: '3s',
-      isPublic: true
-    },
-    {
-      id: 4,
-      title: 'Inspirational Quote',
-      category: 'Titles & Quotes',
-      preview: 'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=400&h=300&fit=crop',
-      tags: ['Typography', 'Motivational', 'Social', 'Elegant'],
-      duration: '6s',
-      isPublic: true
-    },
-    {
-      id: 5,
-      title: 'Product Showcase',
-      category: 'Ads & Promos',
-      preview: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop',
-      tags: ['Product', 'Marketing', 'E-commerce', 'Sales'],
-      duration: '10s',
-      isPublic: true
-    },
-    {
-      id: 6,
-      title: 'World Map Data',
-      category: 'Charts & Maps',
-      preview: 'https://images.unsplash.com/photo-1597149961283-62c2e52b98d6?w=400&h=300&fit=crop',
-      tags: ['Maps', 'Global', 'Data', 'Infographic'],
-      duration: '7s',
-      isPublic: true
-    },
-    {
-      id: 7,
-      title: 'Lower Third News',
-      category: 'Lower Thirds',
-      preview: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=300&fit=crop',
-      tags: ['News', 'Professional', 'Broadcast', 'Clean'],
-      duration: '4s',
-      isPublic: true
-    },
-    {
-      id: 8,
-      title: 'Social Media Story',
-      category: 'Social Media Posts',
-      preview: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=300&fit=crop',
-      tags: ['Stories', 'Instagram', 'Mobile', 'Vertical'],
-      duration: '15s',
-      isPublic: true
-    }
-  ];
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setLoading(true);
+      try {
+        const params = {};
+        if (selectedCategory !== 'All') {
+          params.category = selectedCategory;
+        }
+        if (searchQuery) {
+          params.search = searchQuery;
+        }
+        
+        const templatesData = await apiService.getTemplates(params);
+        setTemplates(templatesData);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = selectedCategory === 'All' || template.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+    fetchTemplates();
+  }, [selectedCategory, searchQuery]);
+
+  const filteredTemplates = templates;
 
   return (
     <div className="p-8">
