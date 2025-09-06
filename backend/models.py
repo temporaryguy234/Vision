@@ -225,6 +225,7 @@ class TemplateAsset(BaseModel):
     duration: Optional[float] = Field(ge=0.0, description="Duration in seconds for video/animation assets")
     frame_rate: Optional[int] = Field(ge=1, le=120, description="Frame rate for video assets")
     file_size: int = Field(ge=0, description="File size in bytes")
+    file_hash: Optional[str] = Field(description="MD5 hash for duplicate detection")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
