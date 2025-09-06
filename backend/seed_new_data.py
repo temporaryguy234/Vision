@@ -672,7 +672,7 @@ async def seed_database():
     
     # Insert exports
     for export in exports:
-        await db.exports.insert_one(export.dict())
+        await db.exports.insert_one(export.model_dump())
     
     print(f"✅ Seeded {len(exports)} exports")
     
