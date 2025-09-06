@@ -37,19 +37,22 @@ class FileStorageManager:
         # Check for Lottie JSON files - can be .json or .lottie extensions
         if (extension == '.json' and ('lottie' in filename_lower or 'bodymovin' in filename_lower)) or extension == '.lottie':
             return AssetType.LOTTIE_JSON
-        elif extension == '.mp4':
+        elif extension in ['.mp4', '.mov', '.avi']:
             return AssetType.MP4
         elif extension == '.webm':
             return AssetType.WEBM_ALPHA
-        elif extension == '.gif':
+        elif extension in ['.gif', '.apng']:
             return AssetType.GIF
-        elif extension == '.png':
+        elif extension in ['.png', '.jpg', '.jpeg']:
             return AssetType.PNG
         elif extension == '.svg':
             return AssetType.SVG
         # Also check for plain JSON files and validate if they're Lottie
         elif extension == '.json':
             return AssetType.LOTTIE_JSON  # We'll validate in save_uploaded_file
+        # Project files - treat as generic assets for now
+        elif extension in ['.aep', '.prproj', '.blend', '.c4d']:
+            return AssetType.PNG  # Store as generic asset
         
         return None
     
