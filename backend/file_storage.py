@@ -186,21 +186,76 @@ class FileStorageManager:
             return False
     
     async def _get_lottie_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from Lottie JSON file"""
+        """Extract metadata from Lottie JSON file or .lottie ZIP file"""
         try:
-            async with aiofiles.open(file_path, 'r') as f:
-                content = await f.read()
-                data = json.loads(content)
-                
-                return {
-                    'width': data.get('w'),
-                    'height': data.get('h'),
-                    'duration': (data.get('op', 0) - data.get('ip', 0)) / data.get('fr', 30),
-                    'frame_rate': data.get('fr', 30)
-                }
+            import zipfile
+            
+            data = None
+            
+            # Check if it's a .lottie file (ZIP format)
+            if file_path.suffix.lower() == '.lottie':
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zip_file:
+                        # Look for data.json in the ZIP
+                        if 'data.json' in zip_file.namelist():
+                            with zip_file.open('data.json') as json_file:
+                                content = json_file.read().decode('utf-8')
+                                data = json.loads(content)
+                        else:
+                            # Some .lottie files might have the JSON at root level
+                            json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                            if json_files:
+                                with zip_file.open(json_files[0]) as json_file:
+                                    content = json_file.read().decode('utf-8')
+                                    data = json.loads(content)
+                except zipfile.BadZipFile:
+                    # If it's not a valid ZIP, treat as regular JSON
+                    async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                        data = json.loads(content)
+            else:
+                # Regular JSON file
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    data = json.loads(content)
+            
+            if not data:
+                return {}
+            
+            metadata = {}
+            
+            # Extract basic dimensions
+            width = data.get('w') or data.get('width', 400)
+            height = data.get('h') or data.get('height', 400)
+            metadata['width'] = int(width) if width else 400
+            metadata['height'] = int(height) if height else 400
+            
+            # Extract frame rate and calculate duration
+            frame_rate = data.get('fr') or data.get('frameRate') or data.get('frame_rate', 30)
+            metadata['frame_rate'] = int(frame_rate) if frame_rate else 30
+            
+            # Calculate duration from in_point, out_point, and frame rate
+            in_point = data.get('ip', 0)
+            out_point = data.get('op') or data.get('outPoint', 60)
+            
+            if out_point and frame_rate:
+                duration_frames = float(out_point) - float(in_point)
+                duration_seconds = duration_frames / float(frame_rate)
+                metadata['duration'] = round(duration_seconds, 2)
+            else:
+                metadata['duration'] = 2.0  # Default duration
+            
+            return metadata
+            
         except Exception as e:
-            print(f"Error getting Lottie metadata: {e}")
-            return {}
+            print(f"Error extracting Lottie metadata: {e}")
+            # Return safe defaults
+            return {
+                'width': 400,
+                'height': 400,
+                'frame_rate': 30,
+                'duration': 2.0
+            }
     
     async def save_uploaded_file(
         self, 
