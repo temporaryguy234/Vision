@@ -141,6 +141,11 @@ export const apiService = {
     return response.data;
   },
 
+  async getLottieFilesAnimationData(animationId) {
+    const response = await api.get(`/lottiefiles/animation/${animationId}/data`);
+    return response.data;
+  },
+
   async getPopularLottieFilesAnimations(params = {}) {
     const response = await api.get('/lottiefiles/popular', { params });
     return response.data;
