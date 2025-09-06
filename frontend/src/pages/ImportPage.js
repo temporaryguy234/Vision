@@ -12,9 +12,6 @@ const ImportPage = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [wizardData, setWizardData] = useState([]);
   const [wizardStep, setWizardStep] = useState(0);
-  
-  // Tab state
-  const [activeTab, setActiveTab] = useState('upload');
 
   const handleDrag = (e) => {
     e.preventDefault();
