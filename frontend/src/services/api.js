@@ -129,6 +129,33 @@ export const apiService = {
     const response = await api.post('/bulk-import/create-templates', templateData);
     return response.data;
   },
+
+  // LottieFiles Integration
+  async searchLottieFilesAnimations(params = {}) {
+    const response = await api.get('/lottiefiles/search', { params });
+    return response.data;
+  },
+
+  async getLottieFilesAnimation(animationId) {
+    const response = await api.get(`/lottiefiles/animation/${animationId}`);
+    return response.data;
+  },
+
+  async getPopularLottieFilesAnimations(params = {}) {
+    const response = await api.get('/lottiefiles/popular', { params });
+    return response.data;
+  },
+
+  async getLottieFilesCategories() {
+    const response = await api.get('/lottiefiles/categories');
+    return response.data;
+  },
+
+  async importLottieFilesAnimation(animationId, targetCategory = null) {
+    const params = targetCategory ? { target_category: targetCategory } : {};
+    const response = await api.post(`/lottiefiles/import/${animationId}`, null, { params });
+    return response.data;
+  },
 };
 
 // Error interceptor
