@@ -868,6 +868,25 @@ async def get_lottiefiles_categories():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get categories: {str(e)}")
 
+@api_router.get("/lottiefiles/animation/{animation_id}/data")
+async def get_lottiefiles_animation_data(animation_id: str):
+    """Get the actual Lottie JSON data for an animation."""
+    try:
+        animation = await lottiefiles_service.get_animation_details(animation_id)
+        if not animation:
+            raise HTTPException(status_code=404, detail="Animation not found")
+        
+        # Get the embedded Lottie data
+        lottie_data = await lottiefiles_service.download_animation(animation.file_url)
+        if not lottie_data:
+            raise HTTPException(status_code=404, detail="Animation data not available")
+        
+        return lottie_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get animation data: {str(e)}")
+
 @api_router.post("/lottiefiles/import/{animation_id}")
 async def import_lottiefiles_animation(
     animation_id: str,
