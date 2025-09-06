@@ -90,7 +90,7 @@ async def seed_database():
                         type=AnimationType.SCALE_IN,
                         delay=1.5,
                         duration=0.6,
-                        easing=EasingType.BOUNCE_OUT
+                        easing=EasingType.EASE_OUT
                     )
                 )
             )
