@@ -3,6 +3,9 @@ import sys
 import json
 from datetime import datetime
 import uuid
+import os
+import tempfile
+from pathlib import Path
 
 class MotionEditAPITester:
     def __init__(self, base_url="https://motion-templates-1.preview.emergentagent.com"):
