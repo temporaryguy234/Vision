@@ -245,6 +245,8 @@ const ElementRenderer = ({
         return renderChartElement();
       case 'map':
         return renderMapElement();
+      case 'lottie':
+        return renderLottieElement();
       default:
         return (
           <div className={`w-16 h-16 bg-gray-200 border border-gray-300 rounded flex items-center justify-center ${isSelected ? 'ring-2 ring-orange-500' : ''}`}>
