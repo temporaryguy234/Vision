@@ -476,8 +476,8 @@ async def get_brand_kits(
 @api_router.post("/brand-kits", response_model=BrandKit)
 async def create_brand_kit(brand_kit: BrandKitCreate):
     """Create a new brand kit"""
-    brand_kit_obj = BrandKit(**brand_kit.dict())
-    await db.brand_kits.insert_one(brand_kit_obj.dict())
+    brand_kit_obj = BrandKit(**brand_kit.model_dump())
+    await db.brand_kits.insert_one(brand_kit_obj.model_dump())
     return brand_kit_obj
 
 @api_router.put("/brand-kits/{kit_id}", response_model=BrandKit)
