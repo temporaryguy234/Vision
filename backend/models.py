@@ -85,7 +85,7 @@ class EasingType(str, Enum):
 class CanvasParameters(BaseModel):
     width: int = Field(ge=100, le=4000, description="Canvas width in pixels")
     height: int = Field(ge=100, le=4000, description="Canvas height in pixels")
-    background_color: Optional[str] = Field(default="#FFFFFF", regex=r"^#[0-9A-Fa-f]{6}$|^transparent$")
+    background_color: Optional[str] = Field(default="#FFFFFF", pattern=r"^#[0-9A-Fa-f]{6}$|^transparent$")
     global_playback_speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Global playback speed multiplier")
 
 class EntranceAnimation(BaseModel):
