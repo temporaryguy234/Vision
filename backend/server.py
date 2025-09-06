@@ -181,8 +181,8 @@ async def get_templates(
     is_public: Optional[bool] = None,
     limit: int = Query(50, le=100),
     skip: int = Query(0, ge=0),
-    sort_by: str = Query("created_at", regex="^(created_at|title|download_count|rating)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$")
+    sort_by: str = Query("created_at", pattern="^(created_at|title|download_count|rating)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$")
 ):
     """Get templates with advanced filtering and sorting"""
     query = {}
