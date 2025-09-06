@@ -4,33 +4,14 @@ import { apiService } from '../services/api';
 
 const ImportPage = () => {
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([
-    {
-      id: 1,
-      name: 'logo-animation.json',
-      type: 'Lottie JSON',
-      size: '2.1 MB',
-      status: 'processing',
-      progress: 65
-    },
-    {
-      id: 2,
-      name: 'intro-template.mp4',
-      type: 'Video',
-      size: '45.2 MB',
-      status: 'completed',
-      progress: 100
-    },
-    {
-      id: 3,
-      name: 'social-post.gif',
-      type: 'GIF',
-      size: '8.7 MB',
-      status: 'failed',
-      progress: 0,
-      error: 'Unsupported GIF format'
-    }
-  ]);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  
+  // Wizard state
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardData, setWizardData] = useState([]);
+  const [wizardStep, setWizardStep] = useState(0);
 
   const handleDrag = (e) => {
     e.preventDefault();
