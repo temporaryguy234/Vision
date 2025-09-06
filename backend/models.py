@@ -161,6 +161,18 @@ class MapElementParameters(BaseModel):
     scale: float = Field(default=1.0, ge=0.1, le=5.0, description="Scale multiplier")
     entrance_animation: Optional[EntranceAnimation] = None
 
+class LottieElementParameters(BaseModel):
+    source_url: Optional[str] = Field(description="Lottie JSON file URL")
+    loop: bool = Field(default=True, description="Loop animation")
+    autoplay: bool = Field(default=True, description="Autoplay animation")
+    speed: float = Field(default=1.0, ge=0.1, le=5.0, description="Animation speed multiplier")
+    opacity: float = Field(default=1.0, ge=0.0, le=1.0)
+    x: float = Field(default=50.0, ge=0.0, le=100.0, description="X position as percentage")
+    y: float = Field(default=50.0, ge=0.0, le=100.0, description="Y position as percentage")
+    scale: float = Field(default=1.0, ge=0.1, le=5.0, description="Scale multiplier")
+    rotation: float = Field(default=0.0, ge=-360.0, le=360.0, description="Rotation in degrees")
+    entrance_animation: Optional[EntranceAnimation] = None
+
 class EditableElement(BaseModel):
     id: str
     type: ElementType
