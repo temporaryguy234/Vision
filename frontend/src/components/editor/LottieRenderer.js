@@ -49,12 +49,25 @@ const LottieRenderer = ({
         setLoading(true);
         setError(null);
         
-        const response = await fetch(sourceUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to load animation: ${response.status}`);
+        let data;
+        
+        // Handle embedded animations via API
+        if (sourceUrl.startsWith('embedded://')) {
+          const animationId = sourceUrl.replace('embedded://', '');
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/lottiefiles/animation/${animationId}/data`);
+          if (!response.ok) {
+            throw new Error(`Failed to load embedded animation: ${response.status}`);
+          }
+          data = await response.json();
+        } else {
+          // Handle external URLs
+          const response = await fetch(sourceUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to load animation: ${response.status}`);
+          }
+          data = await response.json();
         }
         
-        const data = await response.json();
         setAnimationData(data);
       } catch (err) {
         console.error('Error loading Lottie animation:', err);
