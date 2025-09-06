@@ -58,16 +58,16 @@ const ExplorePage = () => {
   return (
     <div className="min-h-full">
       {/* Hero Section */}
-      <section className="px-8 py-12">
+      <section className="px-8 py-8">
         <div className="max-w-7xl mx-auto text-center">
           {/* New Badge */}
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 mb-8">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 mb-6">
             <span className="w-2 h-2 bg-orange-500 rounded-full mr-2 animate-pulse"></span>
             <span className="text-sm font-medium text-orange-600">New: Natural Language Editing</span>
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-5">
             Your Motion Graphics
             <br />
             <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
@@ -76,13 +76,13 @@ const ExplorePage = () => {
           </h1>
 
           {/* Subheading */}
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 mb-6 max-w-3xl mx-auto leading-relaxed">
             Browse and customize professional templates for YouTube, TikTok, and
             Instagram in minutes. No design experience required.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Link
               to="/templates"
               className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200 transform hover:scale-105"
