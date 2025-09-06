@@ -20,7 +20,6 @@ import {
 import { apiService } from '../services/api';
 import Canvas from '../components/editor/Canvas';
 import PropertiesPanel from '../components/editor/PropertiesPanel';
-import ElementTransformer from '../components/editor/ElementTransformer';
 import HistoryManager from '../utils/HistoryManager';
 
 const EditorPage = () => {
