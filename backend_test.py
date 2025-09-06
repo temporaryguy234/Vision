@@ -442,7 +442,7 @@ class MotionEditAPITester:
                 successful_items.append({
                     'filename': result.get('filename'),
                     'title': f"Template from {result.get('filename')}",
-                    'category': 'MISCELLANEOUS',
+                    'category': 'Miscellaneous',  # Use the string value, not enum
                     'tags': ['bulk-import', 'test'],
                     'file_url': result.get('file_url'),
                     'asset_type': result.get('asset_type'),
