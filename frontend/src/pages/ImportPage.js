@@ -29,8 +29,105 @@ const ImportPage = () => {
     setDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      // Handle file upload logic here
-      console.log('Files dropped:', e.dataTransfer.files);
+      handleFileUpload(Array.from(e.dataTransfer.files));
+    }
+  };
+  
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+      
+      // Upload files
+      const response = await apiService.bulkImportUpload(formData);
+      
+      // Process results
+      const processedFiles = response.results.map((result, index) => ({
+        id: Date.now() + index,
+        name: result.filename,
+        type: result.asset_type || 'Unknown',
+        size: formatFileSize(result.metadata?.file_size || files[index].size),
+        status: result.status,
+        file_url: result.file_url,
+        thumbnail_url: result.thumbnail_url,
+        metadata: result.metadata,
+        file_hash: result.file_hash,
+        error: result.message
+      }));
+      
+      setUploadedFiles(prev => [...prev, ...processedFiles]);
+      
+      // Show wizard for successful uploads
+      const successfulUploads = processedFiles.filter(f => f.status === 'success');
+      if (successfulUploads.length > 0) {
+        setWizardData(successfulUploads);
+        setShowWizard(true);
+      }
+      
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+  
+  const handleCreateTemplates = async () => {
+    try {
+      const createData = {
+        items: wizardData.map(item => ({
+          filename: item.name,
+          title: item.templateTitle || item.name.replace(/\.[^/.]+$/, ""),
+          category: item.category || "MISCELLANEOUS",
+          tags: item.tags ? item.tags.split(',').map(tag => tag.trim()) : [],
+          thumbnail_url: item.thumbnail_url || "",
+          creator_id: "current_user",
+          is_public: item.is_public !== false,
+          file_url: item.file_url,
+          asset_type: item.type,
+          metadata: item.metadata,
+          file_hash: item.file_hash
+        }))
+      };
+      
+      const response = await apiService.bulkImportCreateTemplates(createData);
+      
+      if (response.templates_created.length > 0) {
+        alert(`Successfully created ${response.templates_created.length} templates!`);
+        setShowWizard(false);
+        setWizardData([]);
+        
+        // Update uploaded files status
+        setUploadedFiles(prev => prev.map(file => {
+          const created = response.templates_created.find(t => t.filename === file.name);
+          if (created) {
+            return { ...file, status: 'template_created', template_id: created.template_id };
+          }
+          return file;
+        }));
+      }
+      
+      if (response.errors.length > 0) {
+        console.error('Template creation errors:', response.errors);
+      }
+      
+    } catch (error) {
+      console.error('Template creation failed:', error);
+      alert('Failed to create templates. Please try again.');
     }
   };
 
