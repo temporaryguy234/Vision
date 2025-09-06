@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   Play, 
@@ -14,6 +14,7 @@ import {
   Layers,
   Settings
 } from 'lucide-react';
+import { apiService } from '../services/api';
 
 const EditorPage = () => {
   const { templateId } = useParams();
@@ -22,29 +23,93 @@ const EditorPage = () => {
   const [selectedElement, setSelectedElement] = useState(null);
   const [command, setCommand] = useState('');
   const [commandHistory, setCommandHistory] = useState([]);
+  const [template, setTemplate] = useState(null);
+  const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const tabs = ['Content', 'Style', 'Animation'];
 
-  const elements = [
-    { id: 1, type: 'text', name: 'Main Title', content: 'Your Amazing Project' },
-    { id: 2, type: 'text', name: 'Subtitle', content: 'Professional Motion Graphics' },
-    { id: 3, type: 'image', name: 'Logo', content: 'company-logo.png' },
-    { id: 4, type: 'shape', name: 'Background', content: 'Rectangle Shape' },
+  useEffect(() => {
+    const loadTemplate = async () => {
+      if (templateId) {
+        try {
+          const templateData = await apiService.getTemplate(templateId);
+          setTemplate(templateData);
+          
+          // Create a project from template if it doesn't exist
+          const projectData = {
+            title: `Project from ${templateData.title}`,
+            template_id: templateId,
+            template_title: templateData.title,
+            thumbnail: templateData.preview,
+            status: 'Draft',
+            duration: templateData.duration,
+            user_id: 'current_user', // In real app, get from auth
+            project_data: templateData.template_data || {}
+          };
+          
+          const createdProject = await apiService.createProject(projectData);
+          setProject(createdProject);
+        } catch (error) {
+          console.error('Error loading template:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTemplate();
+  }, [templateId]);
+
+  const elements = template?.template_data?.elements || [
+    { id: 'title', type: 'text', name: 'Main Title', content: 'Your Amazing Project' },
+    { id: 'subtitle', type: 'text', name: 'Subtitle', content: 'Professional Motion Graphics' },
+    { id: 'logo', type: 'image', name: 'Logo', content: 'company-logo.png' },
+    { id: 'background', type: 'shape', name: 'Background', content: 'Rectangle Shape' },
   ];
 
-  const runCommand = () => {
-    if (!command.trim()) return;
+  const runCommand = async () => {
+    if (!command.trim() || !project) return;
     
-    // Simple command parser simulation
-    const newCommand = {
-      id: Date.now(),
-      command: command,
-      timestamp: new Date().toLocaleTimeString(),
-      success: true
-    };
-    
-    setCommandHistory([...commandHistory, newCommand]);
-    setCommand('');
+    try {
+      // Call the backend API for natural language command parsing
+      const commandData = {
+        command: command.trim(),
+        element_id: selectedElement,
+        project_id: project.id
+      };
+      
+      const result = await apiService.parseCommand(commandData);
+      
+      const newCommand = {
+        id: Date.now(),
+        command: command,
+        timestamp: new Date().toLocaleTimeString(),
+        success: result.success,
+        message: result.message,
+        changes: result.changes || {}
+      };
+      
+      setCommandHistory([...commandHistory, newCommand]);
+      setCommand('');
+      
+      // If successful, you could update the UI here based on the changes
+      if (result.success) {
+        console.log('Command executed successfully:', result.message);
+        // Here you could update the template preview based on the changes
+      }
+    } catch (error) {
+      console.error('Error executing command:', error);
+      const errorCommand = {
+        id: Date.now(),
+        command: command,
+        timestamp: new Date().toLocaleTimeString(),
+        success: false,
+        message: 'Error executing command'
+      };
+      setCommandHistory([...commandHistory, errorCommand]);
+      setCommand('');
+    }
   };
 
   const handleKeyPress = (e) => {
