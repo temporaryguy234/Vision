@@ -1,395 +1,644 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Play, 
-  Pause, 
+  ArrowLeft, 
+  Save, 
   RotateCcw, 
   RotateCw, 
-  Download, 
-  Save,
-  Type,
-  Image,
-  BarChart3,
-  MapPin,
-  Layers,
-  Settings
+  ZoomIn,
+  ZoomOut,
+  Play,
+  Pause,
+  Copy,
+  Trash2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import Canvas from '../components/editor/Canvas';
+import PropertiesPanel from '../components/editor/PropertiesPanel';
+import ElementTransformer from '../components/editor/ElementTransformer';
+import HistoryManager from '../utils/HistoryManager';
 
 const EditorPage = () => {
   const { templateId } = useParams();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [activeTab, setActiveTab] = useState('Content');
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [command, setCommand] = useState('');
-  const [commandHistory, setCommandHistory] = useState([]);
+  const navigate = useNavigate();
+  const canvasRef = useRef(null);
+  
+  // Core state
   const [template, setTemplate] = useState(null);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const tabs = ['Content', 'Style', 'Animation'];
-
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Editor state
+  const [editorState, setEditorState] = useState({
+    canvas: {},
+    elements: {}
+  });
+  const [selectedElements, setSelectedElements] = useState([]);
+  const [activeTab, setActiveTab] = useState('Content');
+  const [zoom, setZoom] = useState(100);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [commandInput, setCommandInput] = useState('');
+  
+  // History system
+  const [historyManager] = useState(() => new HistoryManager());
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  
+  // Brand kits
+  const [brandKits, setBrandKits] = useState([]);
+  const [activeBrandKit, setActiveBrandKit] = useState(null);
+  
+  // Load template and create/load project
   useEffect(() => {
-    const loadTemplate = async () => {
-      if (templateId) {
-        try {
-          const templateData = await apiService.getTemplate(templateId);
-          setTemplate(templateData);
-          
-          // Create a project from template if it doesn't exist
-          const projectData = {
-            title: `Project from ${templateData.title}`,
+    const loadEditor = async () => {
+      if (!templateId) return;
+      
+      try {
+        setLoading(true);
+        
+        // Load template
+        const templateData = await apiService.getTemplate(templateId);
+        setTemplate(templateData);
+        
+        // Try to find existing project or create new one
+        const existingProjects = await apiService.getProjects('current_user', { template_id: templateId });
+        let projectData;
+        
+        if (existingProjects.length > 0) {
+          // Use existing project
+          projectData = existingProjects[0];
+        } else {
+          // Create new project
+          projectData = await apiService.createProject({
             template_id: templateId,
-            template_title: templateData.title,
-            thumbnail: templateData.preview,
-            status: 'Draft',
-            duration: templateData.duration,
-            user_id: 'current_user', // In real app, get from auth
-            project_data: templateData.template_data || {}
-          };
-          
-          const createdProject = await apiService.createProject(projectData);
-          setProject(createdProject);
-        } catch (error) {
-          console.error('Error loading template:', error);
-        } finally {
-          setLoading(false);
+            title: `Project from ${templateData.title}`,
+            user_id: 'current_user'
+          });
+        }
+        
+        setProject(projectData);
+        setEditorState(projectData.current_editor_state || {
+          canvas: templateData.editable_parameters_schema.canvas,
+          elements: {}
+        });
+        
+        // Initialize history
+        historyManager.initialize(projectData.current_editor_state);
+        updateHistoryButtons();
+        
+        // Load brand kits
+        const userBrandKits = await apiService.getBrandKits('current_user');
+        setBrandKits(userBrandKits);
+        
+      } catch (err) {
+        console.error('Error loading editor:', err);
+        setError('Failed to load template');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadEditor();
+  }, [templateId]);
+  
+  // Update history buttons
+  const updateHistoryButtons = useCallback(() => {
+    setCanUndo(historyManager.canUndo());
+    setCanRedo(historyManager.canRedo());
+  }, [historyManager]);
+  
+  // Handle element selection
+  const handleElementSelect = useCallback((elementId, multiSelect = false) => {
+    if (multiSelect) {
+      setSelectedElements(prev => 
+        prev.includes(elementId) 
+          ? prev.filter(id => id !== elementId)
+          : [...prev, elementId]
+      );
+    } else {
+      setSelectedElements([elementId]);
+    }
+  }, []);
+  
+  // Handle element transformation
+  const handleElementTransform = useCallback((elementId, transform) => {
+    const oldState = { ...editorState };
+    const newState = {
+      ...editorState,
+      elements: {
+        ...editorState.elements,
+        [elementId]: {
+          ...editorState.elements[elementId],
+          ...transform
         }
       }
     };
-
-    loadTemplate();
-  }, [templateId]);
-
-  const elements = template?.template_data?.elements || [
-    { id: 'title', type: 'text', name: 'Main Title', content: 'Your Amazing Project' },
-    { id: 'subtitle', type: 'text', name: 'Subtitle', content: 'Professional Motion Graphics' },
-    { id: 'logo', type: 'image', name: 'Logo', content: 'company-logo.png' },
-    { id: 'background', type: 'shape', name: 'Background', content: 'Rectangle Shape' },
-  ];
-
-  const runCommand = async () => {
-    if (!command.trim() || !project) return;
+    
+    // Add to history
+    historyManager.addAction({
+      type: 'transform',
+      elementId,
+      oldState,
+      newState,
+      timestamp: Date.now()
+    });
+    
+    setEditorState(newState);
+    updateHistoryButtons();
+  }, [editorState, historyManager, updateHistoryButtons]);
+  
+  // Handle property change
+  const handlePropertyChange = useCallback((elementId, property, value, oldValue) => {
+    // Validate the change based on template schema
+    const element = template?.editable_parameters_schema.elements.find(e => e.id === elementId);
+    if (!element) return;
+    
+    // TODO: Add comprehensive validation based on element type and property
+    
+    const oldState = { ...editorState };
+    const newState = {
+      ...editorState,
+      elements: {
+        ...editorState.elements,
+        [elementId]: {
+          ...editorState.elements[elementId],
+          [property]: value
+        }
+      }
+    };
+    
+    // Add to history
+    historyManager.addAction({
+      type: 'property',
+      elementId,
+      property,
+      oldValue,
+      newValue: value,
+      oldState,
+      newState,
+      timestamp: Date.now()
+    });
+    
+    setEditorState(newState);
+    updateHistoryButtons();
+  }, [editorState, template, historyManager, updateHistoryButtons]);
+  
+  // Handle canvas property change
+  const handleCanvasChange = useCallback((property, value, oldValue) => {
+    const oldState = { ...editorState };
+    const newState = {
+      ...editorState,
+      canvas: {
+        ...editorState.canvas,
+        [property]: value
+      }
+    };
+    
+    historyManager.addAction({
+      type: 'canvas',
+      property,
+      oldValue,
+      newValue: value,
+      oldState,
+      newState,
+      timestamp: Date.now()
+    });
+    
+    setEditorState(newState);
+    updateHistoryButtons();
+  }, [editorState, historyManager, updateHistoryButtons]);
+  
+  // Undo/Redo
+  const handleUndo = useCallback(() => {
+    const previousState = historyManager.undo();
+    if (previousState) {
+      setEditorState(previousState);
+      updateHistoryButtons();
+    }
+  }, [historyManager, updateHistoryButtons]);
+  
+  const handleRedo = useCallback(() => {
+    const nextState = historyManager.redo();
+    if (nextState) {
+      setEditorState(nextState);
+      updateHistoryButtons();
+    }
+  }, [historyManager, updateHistoryButtons]);
+  
+  // Save project
+  const handleSave = useCallback(async () => {
+    if (!project) return;
     
     try {
-      // Call the backend API for natural language command parsing
-      const commandData = {
-        command: command.trim(),
-        element_id: selectedElement,
-        project_id: project.id
-      };
+      setSaving(true);
+      await apiService.updateProject(project.id, {
+        current_editor_state: editorState,
+        updated_at: new Date().toISOString()
+      });
       
-      const result = await apiService.parseCommand(commandData);
+      // Show success feedback
+      // TODO: Add toast notification system
+      console.log('Project saved successfully');
       
-      const newCommand = {
-        id: Date.now(),
-        command: command,
-        timestamp: new Date().toLocaleTimeString(),
-        success: result.success,
-        message: result.message,
-        changes: result.changes || {}
-      };
+    } catch (err) {
+      console.error('Error saving project:', err);
+      setError('Failed to save project');
+    } finally {
+      setSaving(false);
+    }
+  }, [project, editorState]);
+  
+  // Save as new project
+  const handleSaveAs = useCallback(async () => {
+    if (!template) return;
+    
+    const title = prompt('Enter project name:', `Copy of ${project?.title || template.title}`);
+    if (!title) return;
+    
+    try {
+      setSaving(true);
+      const newProject = await apiService.createProject({
+        template_id: templateId,
+        title,
+        user_id: 'current_user'
+      });
       
-      setCommandHistory([...commandHistory, newCommand]);
-      setCommand('');
+      await apiService.updateProject(newProject.id, {
+        current_editor_state: editorState
+      });
       
-      // If successful, you could update the UI here based on the changes
-      if (result.success) {
-        console.log('Command executed successfully:', result.message);
-        // Here you could update the template preview based on the changes
+      setProject(newProject);
+      console.log('Project saved as new project');
+      
+    } catch (err) {
+      console.error('Error saving as new project:', err);
+      setError('Failed to save as new project');
+    } finally {
+      setSaving(false);
+    }
+  }, [template, project, templateId, editorState]);
+  
+  // Handle alignment
+  const handleAlign = useCallback((alignment) => {
+    if (selectedElements.length === 0) return;
+    
+    const oldState = { ...editorState };
+    let newElements = { ...editorState.elements };
+    
+    selectedElements.forEach(elementId => {
+      const element = newElements[elementId] || {};
+      
+      switch (alignment) {
+        case 'left':
+          newElements[elementId] = { ...element, x: 0 };
+          break;
+        case 'center-h':
+          newElements[elementId] = { ...element, x: 50 };
+          break;
+        case 'right':
+          newElements[elementId] = { ...element, x: 100 };
+          break;
+        case 'top':
+          newElements[elementId] = { ...element, y: 0 };
+          break;
+        case 'center-v':
+          newElements[elementId] = { ...element, y: 50 };
+          break;
+        case 'bottom':
+          newElements[elementId] = { ...element, y: 100 };
+          break;
       }
-    } catch (error) {
-      console.error('Error executing command:', error);
-      const errorCommand = {
-        id: Date.now(),
-        command: command,
-        timestamp: new Date().toLocaleTimeString(),
-        success: false,
-        message: 'Error executing command'
-      };
-      setCommandHistory([...commandHistory, errorCommand]);
-      setCommand('');
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      runCommand();
-    }
-  };
-
-  return (
-    <div className="h-full flex">
-      {/* Main Editor Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Toolbar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-lg font-semibold text-gray-900">Template Editor</h2>
-              <span className="text-sm text-gray-500">#{templateId}</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-              >
-                {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                {isPlaying ? 'Pause' : 'Play'}
-              </button>
-              
-              <button className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </button>
-              
-              <button className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Canvas Area */}
-        <div className="flex-1 bg-gray-100 p-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-black rounded-lg aspect-video relative overflow-hidden shadow-2xl">
-              {/* Preview Canvas */}
-              {loading ? (
-                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                  <div className="text-white">Loading template...</div>
-                </div>
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <h1 className="text-4xl font-bold mb-4">
-                      {template?.title || 'Your Amazing Project'}
-                    </h1>
-                    <p className="text-xl opacity-90">
-                      {template?.description || 'Professional Motion Graphics'}
-                    </p>
-                    
-                    {/* Mock logo */}
-                    <div className="mt-8 w-16 h-16 bg-white/20 rounded-full mx-auto flex items-center justify-center">
-                      <span className="text-2xl">🚀</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Selection indicators */}
-              {selectedElement && (
-                <div className="absolute inset-4 border-2 border-orange-500 rounded pointer-events-none">
-                  <div className="absolute -top-8 left-0 bg-orange-500 text-white px-2 py-1 text-xs rounded">
-                    Selected: {elements.find(e => e.id === selectedElement)?.name}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Timeline */}
-            <div className="mt-6 bg-white rounded-lg p-4 shadow-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Timeline</h3>
-                <div className="flex items-center space-x-2">
-                  <button className="p-2 text-gray-600 hover:text-gray-900">
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                  <button className="p-2 text-gray-600 hover:text-gray-900">
-                    <RotateCw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="h-16 bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center">
-                <span className="text-gray-500 text-sm">Timeline visualization (5 seconds)</span>
-              </div>
-            </div>
-          </div>
+    });
+    
+    const newState = { ...editorState, elements: newElements };
+    
+    historyManager.addAction({
+      type: 'align',
+      alignment,
+      elements: selectedElements,
+      oldState,
+      newState,
+      timestamp: Date.now()
+    });
+    
+    setEditorState(newState);
+    updateHistoryButtons();
+  }, [selectedElements, editorState, historyManager, updateHistoryButtons]);
+  
+  // Apply brand kit
+  const handleApplyBrandKit = useCallback((brandKit) => {
+    if (!brandKit || selectedElements.length === 0) return;
+    
+    const oldState = { ...editorState };
+    let newElements = { ...editorState.elements };
+    
+    selectedElements.forEach(elementId => {
+      const element = newElements[elementId] || {};
+      const templateElement = template?.editable_parameters_schema.elements.find(e => e.id === elementId);
+      
+      if (templateElement?.type === 'text' && brandKit.colors.length > 0) {
+        newElements[elementId] = { 
+          ...element, 
+          color: brandKit.colors[0],
+          font_family: brandKit.fonts[0] || element.font_family
+        };
+      }
+    });
+    
+    const newState = { ...editorState, elements: newElements };
+    
+    historyManager.addAction({
+      type: 'brand-kit',
+      brandKitId: brandKit.id,
+      elements: selectedElements,
+      oldState,
+      newState,
+      timestamp: Date.now()
+    });
+    
+    setEditorState(newState);
+    setActiveBrandKit(brandKit);
+    updateHistoryButtons();
+  }, [selectedElements, editorState, template, historyManager, updateHistoryButtons]);
+  
+  // Handle zoom
+  const handleZoom = useCallback((direction) => {
+    setZoom(prev => {
+      const newZoom = direction === 'in' 
+        ? Math.min(200, prev + 25) 
+        : Math.max(25, prev - 25);
+      return newZoom;
+    });
+  }, []);
+  
+  // Handle command input (placeholder for now)
+  const handleCommandSubmit = useCallback(() => {
+    // TODO: Implement natural language command processing
+    console.log('Command:', commandInput);
+    setCommandInput('');
+  }, [commandInput]);
+  
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading template...</p>
         </div>
       </div>
-
-      {/* Right Panel */}
-      <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-        {/* Natural Language Commands */}
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900 mb-4">Command</h3>
-          <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="Type a command..."
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
-            />
-            <button
-              onClick={runCommand}
-              className="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-colors"
-            >
-              Run
-            </button>
-          </div>
-          
-          {/* Command History */}
-          {commandHistory.length > 0 && (
-            <div className="mt-4 space-y-2 max-h-32 overflow-y-auto">
-              {commandHistory.slice(-3).map((cmd) => (
-                <div key={cmd.id} className={`text-xs p-2 rounded ${
-                  cmd.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                }`}>
-                  <div className={`font-medium ${
-                    cmd.success ? 'text-green-900' : 'text-red-900'
-                  }`}>{cmd.command}</div>
-                  <div className={`${
-                    cmd.success ? 'text-green-600' : 'text-red-600'
-                  }`}>{cmd.message}</div>
-                  <div className="text-gray-500">{cmd.timestamp}</div>
-                </div>
-              ))}
-            </div>
-          )}
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => navigate('/templates')}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+          >
+            Back to Templates
+          </button>
         </div>
-
-        {/* Properties Panel */}
-        <div className="flex-1 flex flex-col">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200">
-            {tabs.map((tab) => (
+      </div>
+    );
+  }
+  
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Top Bar */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/templates')}
+            className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Templates</span>
+          </button>
+          
+          <div className="text-sm text-gray-500">
+            <span className="font-medium text-gray-900">{template?.title}</span>
+            {project && <span> • {project.title}</span>}
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {/* History Controls */}
+          <button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg hover:bg-gray-100 transition-colors"
+            title="Undo"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg hover:bg-gray-100 transition-colors"
+            title="Redo"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+          
+          <div className="w-px h-6 bg-gray-300 mx-2"></div>
+          
+          {/* Zoom Controls */}
+          <button
+            onClick={() => handleZoom('out')}
+            disabled={zoom <= 25}
+            className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg hover:bg-gray-100 transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          
+          <span className="text-sm text-gray-600 min-w-[3rem] text-center">{zoom}%</span>
+          
+          <button
+            onClick={() => handleZoom('in')}
+            disabled={zoom >= 200}
+            className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg hover:bg-gray-100 transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          
+          <div className="w-px h-6 bg-gray-300 mx-2"></div>
+          
+          {/* Playback Controls */}
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            title={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          </button>
+          
+          <div className="w-px h-6 bg-gray-300 mx-2"></div>
+          
+          {/* Save Controls */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-400 transition-colors"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">{saving ? 'Saving...' : 'Save'}</span>
+          </button>
+          
+          <button
+            onClick={handleSaveAs}
+            disabled={saving}
+            className="hidden sm:flex items-center px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+          >
+            Save As...
+          </button>
+        </div>
+      </div>
+      
+      {/* Command Input Bar (Mobile) */}
+      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            placeholder="Type a command..."
+            value={commandInput}
+            onChange={(e) => setCommandInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleCommandSubmit()}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+          />
+          <button
+            onClick={handleCommandSubmit}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+          >
+            Run
+          </button>
+        </div>
+      </div>
+      
+      {/* Main Editor Area */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Canvas Area */}
+        <div className="flex-1 flex flex-col bg-gray-100">
+          {/* Alignment Tools */}
+          {selectedElements.length > 0 && (
+            <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center space-x-2 text-sm">
+              <span className="text-gray-600 mr-2">Align:</span>
+              
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-3 px-4 text-sm font-medium ${
-                  activeTab === tab
-                    ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50/50'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                onClick={() => handleAlign('left')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Align Left"
               >
-                {tab}
+                <AlignLeft className="w-4 h-4" />
               </button>
-            ))}
-          </div>
-
-          {/* Elements List */}
-          <div className="p-6">
-            <h4 className="font-semibold text-gray-900 mb-4">Elements</h4>
-            <div className="space-y-2">
-              {elements.map((element) => {
-                const getIcon = (type) => {
-                  switch (type) {
-                    case 'text': return Type;
-                    case 'image': return Image;
-                    case 'chart': return BarChart3;
-                    case 'map': return MapPin;
-                    case 'shape': return Layers;
-                    default: return Settings;
-                  }
-                };
-                
-                const Icon = getIcon(element.type);
-                
-                return (
-                  <button
-                    key={element.id}
-                    onClick={() => setSelectedElement(element.id)}
-                    className={`w-full text-left p-3 rounded-lg transition-colors ${
-                      selectedElement === element.id
-                        ? 'bg-orange-100 border border-orange-200'
-                        : 'hover:bg-gray-50 border border-transparent'
-                    }`}
+              
+              <button
+                onClick={() => handleAlign('center-h')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Center Horizontally"
+              >
+                <AlignCenter className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={() => handleAlign('right')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Align Right"
+              >
+                <AlignRight className="w-4 h-4" />
+              </button>
+              
+              <div className="w-px h-4 bg-gray-300 mx-1"></div>
+              
+              <button
+                onClick={() => handleAlign('top')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Align Top"
+              >
+                <AlignHorizontalJustifyCenter className="w-4 h-4 rotate-90" />
+              </button>
+              
+              <button
+                onClick={() => handleAlign('center-v')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Center Vertically"
+              >
+                <AlignVerticalJustifyCenter className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={() => handleAlign('bottom')}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                title="Align Bottom"
+              >
+                <AlignHorizontalJustifyCenter className="w-4 h-4 -rotate-90" />
+              </button>
+              
+              {brandKits.length > 0 && (
+                <>
+                  <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                  <select
+                    value={activeBrandKit?.id || ''}
+                    onChange={(e) => {
+                      const kit = brandKits.find(k => k.id === e.target.value);
+                      if (kit) handleApplyBrandKit(kit);
+                    }}
+                    className="text-xs px-2 py-1 border border-gray-200 rounded"
                   >
-                    <div className="flex items-center">
-                      <Icon className={`w-4 h-4 mr-3 ${
-                        selectedElement === element.id ? 'text-orange-600' : 'text-gray-500'
-                      }`} />
-                      <div>
-                        <div className="font-medium text-gray-900">{element.name}</div>
-                        <div className="text-sm text-gray-500">{element.content}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Properties for selected element */}
-          {selectedElement && (
-            <div className="border-t border-gray-200 p-6">
-              <h4 className="font-semibold text-gray-900 mb-4">Properties</h4>
-              
-              {activeTab === 'Content' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Text Content</label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                      defaultValue="Your Amazing Project"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Font Size</label>
-                    <input
-                      type="range"
-                      min="12"
-                      max="72"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-              
-              {activeTab === 'Style' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
-                    <input
-                      type="color"
-                      className="w-full h-10 border border-gray-200 rounded-lg"
-                      defaultValue="#ffffff"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Opacity</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-              
-              {activeTab === 'Animation' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Animation Type</label>
-                    <select className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                      <option>Fade In</option>
-                      <option>Slide In</option>
-                      <option>Scale In</option>
-                      <option>Bounce In</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration (seconds)</label>
-                    <input
-                      type="number"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                      defaultValue="1"
-                      min="0.1"
-                      max="10"
-                      step="0.1"
-                    />
-                  </div>
-                </div>
+                    <option value="">Apply Brand Kit</option>
+                    {brandKits.map(kit => (
+                      <option key={kit.id} value={kit.id}>{kit.name}</option>
+                    ))}
+                  </select>
+                </>
               )}
             </div>
           )}
+          
+          {/* Canvas */}
+          <div className="flex-1 p-4 overflow-auto">
+            <Canvas
+              ref={canvasRef}
+              template={template}
+              editorState={editorState}
+              selectedElements={selectedElements}
+              zoom={zoom}
+              isPlaying={isPlaying}
+              onElementSelect={handleElementSelect}
+              onElementTransform={handleElementTransform}
+              onCanvasChange={handleCanvasChange}
+            />
+          </div>
+        </div>
+        
+        {/* Properties Panel */}
+        <div className="w-full md:w-80 bg-white border-l border-gray-200 flex flex-col">
+          <PropertiesPanel
+            template={template}
+            editorState={editorState}
+            selectedElements={selectedElements}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onPropertyChange={handlePropertyChange}
+            onCanvasChange={handleCanvasChange}
+            commandInput={commandInput}
+            onCommandInputChange={setCommandInput}
+            onCommandSubmit={handleCommandSubmit}
+            brandKits={brandKits}
+            onApplyBrandKit={handleApplyBrandKit}
+          />
         </div>
       </div>
     </div>
