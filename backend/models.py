@@ -118,8 +118,8 @@ class ImageElementParameters(BaseModel):
     entrance_animation: Optional[EntranceAnimation] = None
 
 class ShapeElementParameters(BaseModel):
-    fill_color: str = Field(default="#0000FF", regex=r"^#[0-9A-Fa-f]{6}$")
-    stroke_color: Optional[str] = Field(regex=r"^#[0-9A-Fa-f]{6}$")
+    fill_color: str = Field(default="#0000FF", pattern=r"^#[0-9A-Fa-f]{6}$")
+    stroke_color: Optional[str] = Field(pattern=r"^#[0-9A-Fa-f]{6}$")
     stroke_width: int = Field(default=0, ge=0, le=20, description="Stroke width in pixels")
     corner_radius: int = Field(default=0, ge=0, le=100, description="Corner radius in pixels")
     opacity: float = Field(default=1.0, ge=0.0, le=1.0)
