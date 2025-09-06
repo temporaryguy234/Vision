@@ -220,6 +220,7 @@ const ImportPage = () => {
         {/* Tab Content */}
         {activeTab === 'upload' && (
           <div className="space-y-8">
+            {/* Upload Area */}
 
         {/* Upload Area */}
         <div
