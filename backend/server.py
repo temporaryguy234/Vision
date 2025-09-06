@@ -133,6 +133,10 @@ class ParametersValidator:
                     if params.border_width < 0 or params.border_width > 12:
                         errors[f"{element_prefix}.border_width"] = "Border width must be between 0 and 12 pixels"
                 
+                elif element.type == ElementType.LOTTIE:
+                    if params.speed < 0.1 or params.speed > 5.0:
+                        errors[f"{element_prefix}.speed"] = "Animation speed must be between 0.1 and 5.0"
+                
                 # Validate common parameters (position, scale, rotation, opacity)
                 if hasattr(params, 'x') and (params.x < 0 or params.x > 100):
                     errors[f"{element_prefix}.x"] = "X position must be between 0 and 100 percent"
