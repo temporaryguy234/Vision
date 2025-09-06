@@ -240,6 +240,21 @@ backend:
         - agent: "testing"
         - comment: "✅ PASSED - LottieFiles import endpoint working perfectly. Successfully imports animations and creates templates with proper LOTTIE elements. Fixed missing file_hash field in TemplateAsset creation and implemented mock Lottie data download for demo purposes. Import creates templates with correct category mapping, proper LOTTIE element parameters (source_url, loop, autoplay, speed, opacity, position, scale, rotation), and generates proper template assets. Properly returns 404 for invalid animation IDs. Supports optional target_category parameter."
 
+  - task: "LottieFiles Animation Data Endpoint"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Fixed LottieFiles animation data endpoint that was returning HTML instead of JSON due to missing /api prefix"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ PASSED - LottieFiles animation data endpoint (/api/lottiefiles/animation/{id}/data) working perfectly. Successfully tested with 'loading_spinner' and 'success_checkmark' animation IDs. Returns valid Lottie JSON data (not HTML), with proper JSON structure including required fields (v, fr, ip, op, w, h, layers). Embedded:// URL handling works correctly - animations with embedded:// URLs are processed and return proper Lottie data. JSON is parseable and serializable. Properly returns 404 for invalid animation IDs. Import functionality creates templates with correct embedded:// URLs that can be accessed via the data endpoint."
+
 frontend:
   - task: "Install and configure Lottie React library"
     implemented: true
