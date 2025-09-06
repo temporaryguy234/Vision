@@ -133,12 +133,17 @@ const ImportPage = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'success':
       case 'completed':
+      case 'template_created':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'error':
       case 'failed':
         return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'processing':
+      case 'duplicate':
         return <AlertCircle className="w-5 h-5 text-yellow-600" />;
+      case 'processing':
+        return <AlertCircle className="w-5 h-5 text-blue-600" />;
       default:
         return <File className="w-5 h-5 text-gray-600" />;
     }
