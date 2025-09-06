@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileVideo, Image, File, CheckCircle, XCircle, AlertCircle, Plus, Edit } from 'lucide-react';
+import { Upload, FileVideo, Image, File, CheckCircle, XCircle, AlertCircle, Plus, Edit, Globe } from 'lucide-react';
 import { apiService } from '../services/api';
+import LottieFilesBrowser from '../components/LottieFilesBrowser';
 
 const ImportPage = () => {
   const [dragActive, setDragActive] = useState(false);
