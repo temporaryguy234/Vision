@@ -961,6 +961,9 @@ async def import_lottiefiles_animation(
         await db.templates.insert_one(template_obj.model_dump())
         
         # Create template asset record
+        import hashlib
+        file_hash = hashlib.md5(f"{animation.file_url}_{animation.id}".encode()).hexdigest()
+        
         asset_data = {
             "template_id": template_obj.id,
             "asset_type": AssetType.LOTTIE_JSON,
@@ -969,7 +972,8 @@ async def import_lottiefiles_animation(
             "height": animation.dimensions.get("height"),
             "duration": animation.duration,
             "frame_rate": 30,  # Default for Lottie
-            "file_size": animation.file_size or 0
+            "file_size": animation.file_size or 0,
+            "file_hash": file_hash
         }
         
         asset_obj = TemplateAsset(**asset_data)
