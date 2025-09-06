@@ -198,11 +198,12 @@ const ImportPage = () => {
           <input
             type="file"
             multiple
-            accept=".json,.mp4,.gif,.webm,.mov"
+            accept=".json,.mp4,.gif,.webm,.mov,.png,.svg"
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            disabled={isUploading}
             onChange={(e) => {
               if (e.target.files) {
-                console.log('Files selected:', e.target.files);
+                handleFileUpload(Array.from(e.target.files));
               }
             }}
           />
