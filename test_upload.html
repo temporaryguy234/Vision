@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotionEdit File Upload Test</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        .upload-form {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .upload-form:hover {
+            border-color: #f97316;
+            background: #fef3f2;
+        }
+        input[type="file"] {
+            margin: 1rem 0;
+        }
+        button {
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-1px);
+        }
+        .result {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #f3f4f6;
+        }
+        .success {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .supported-formats {
+            margin-top: 1rem;
+            text-align: left;
+        }
+        .supported-formats h3 {
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        .format-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .format-item {
+            background: #f9fafb;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border-left: 4px solid #f97316;
+        }
+        .format-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .format-desc {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 MotionEdit File Upload Test</h1>
+        <p>Test the comprehensive file upload system for motion graphics templates.</p>
+        
+        <form id="uploadForm" class="upload-form">
+            <h3>📁 Select Template Asset File</h3>
+            <input type="file" id="fileInput" accept=".json,.mp4,.webm,.gif,.png,.svg" required>
+            <br>
+            <label for="templateId">Template ID:</label>
+            <select id="templateId">
+                <option value="template_001">Modern Social Media Intro</option>
+                <option value="template_002">Animated Data Chart</option>
+                <option value="template_003">Logo Reveal Animation</option>
+                <option value="template_004">Inspirational Quote Typography</option>
+                <option value="template_005">World Map Data Visualization</option>
+            </select>
+            <br><br>
+            <button type="submit">🚀 Upload Asset</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;"></div>
+
+        <div class="supported-formats">
+            <h3>📋 Supported File Formats</h3>
+            <div class="format-list">
+                <div class="format-item">
+                    <div class="format-name">Lottie JSON</div>
+                    <div class="format-desc">Vector animations (.json)</div>
+                </div>
+                <div class="format-item">
+                    <div class="format-name">MP4 Video</div>
+                    <div class="format-desc">Standard video format (.mp4)</div>
+                </div>
+                <div class="format-item">
+                    <div class="format-name">WebM Alpha</div>
+                    <div class="format-desc">Web video with transparency (.webm)</div>
+                </div>
+                <div class="format-item">
+                    <div class="format-name">Animated GIF</div>
+                    <div class="format-desc">Animated images (.gif)</div>
+                </div>
+                <div class="format-item">
+                    <div class="format-name">PNG Images</div>
+                    <div class="format-desc">Static images (.png)</div>
+                </div>
+                <div class="format-item">
+                    <div class="format-name">SVG Graphics</div>
+                    <div class="format-desc">Vector graphics (.svg)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const templateId = document.getElementById('templateId').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                showResult('Please select a file', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                showResult('Uploading file...', 'info');
+                
+                const response = await fetch(`/api/templates/${templateId}/upload-asset`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(`
+                        <strong>✅ Upload successful!</strong><br>
+                        <strong>Asset ID:</strong> ${result.id}<br>
+                        <strong>File URL:</strong> ${result.file_url}<br>
+                        <strong>Asset Type:</strong> ${result.asset_type}<br>
+                        <strong>Dimensions:</strong> ${result.width || 'N/A'} x ${result.height || 'N/A'}<br>
+                        <strong>Duration:</strong> ${result.duration || 'N/A'}s<br>
+                        <strong>File Size:</strong> ${(result.file_size / 1024).toFixed(1)} KB
+                    `, 'success');
+                } else {
+                    showResult(`❌ Upload failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Upload error: ${error.message}`, 'error');
+            }
+        });
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
