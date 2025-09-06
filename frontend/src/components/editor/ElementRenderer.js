@@ -210,6 +210,27 @@ const ElementRenderer = ({
       </div>
     );
   };
+
+  // Render Lottie element
+  const renderLottieElement = () => {
+    const sourceUrl = params.source_url;
+    const loop = params.loop !== false;
+    const autoplay = params.autoplay !== false;
+    const speed = params.speed || 1.0;
+    
+    return (
+      <LottieRenderer
+        sourceUrl={sourceUrl}
+        loop={loop}
+        autoplay={autoplay}
+        speed={speed}
+        isSelected={isSelected}
+        isPlaying={isPlaying}
+        onClick={onClick}
+        onDragStart={onDragStart}
+      />
+    );
+  };
   
   // Render appropriate element type
   const renderElement = () => {
