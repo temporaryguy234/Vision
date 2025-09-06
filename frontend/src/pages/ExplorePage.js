@@ -1,59 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Users, FileText, Clock, Target } from 'lucide-react';
+import { apiService } from '../services/api';
 
 const ExplorePage = () => {
-  const stats = [
+  const [stats, setStats] = useState([
     { icon: Users, value: '10K+', label: 'Active Creators', color: 'text-orange-600' },
     { icon: FileText, value: '500+', label: 'Templates', color: 'text-blue-600' },
     { icon: Clock, value: '95%', label: 'Time Saved', color: 'text-green-600' },
     { icon: Target, value: '2 Min', label: 'Avg. Edit Time', color: 'text-purple-600' },
-  ];
+  ]);
+  const [featuredTemplates, setFeaturedTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const featuredTemplates = [
-    {
-      id: 1,
-      title: 'Social Media Intro',
-      category: 'Intros & Outros',
-      preview: 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=300&h=200&fit=crop',
-      tags: ['Instagram', 'TikTok', 'Modern']
-    },
-    {
-      id: 2,
-      title: 'Data Visualization',
-      category: 'Charts & Maps',
-      preview: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&h=200&fit=crop',
-      tags: ['Charts', 'Analytics', 'Business']
-    },
-    {
-      id: 3,
-      title: 'Logo Animation',
-      category: 'Animated Icons',
-      preview: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=300&h=200&fit=crop',
-      tags: ['Logo', 'Branding', 'Professional']
-    },
-    {
-      id: 4,
-      title: 'Quote Typography',
-      category: 'Titles & Quotes',
-      preview: 'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=300&h=200&fit=crop',
-      tags: ['Typography', 'Motivational', 'Social']
-    },
-    {
-      id: 5,
-      title: 'Product Showcase',
-      category: 'Ads & Promos',
-      preview: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop',
-      tags: ['Product', 'Marketing', 'E-commerce']
-    },
-    {
-      id: 6,
-      title: 'World Map Visualization',
-      category: 'Charts & Maps',
-      preview: 'https://images.unsplash.com/photo-1597149961283-62c2e52b98d6?w=300&h=200&fit=crop',
-      tags: ['Maps', 'Global', 'Data']
-    }
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch real statistics
+        const statsData = await apiService.getStats();
+        setStats([
+          { icon: Users, value: statsData.active_creators, label: 'Active Creators', color: 'text-orange-600' },
+          { icon: FileText, value: statsData.templates, label: 'Templates', color: 'text-blue-600' },
+          { icon: Clock, value: statsData.time_saved, label: 'Time Saved', color: 'text-green-600' },
+          { icon: Target, value: statsData.avg_edit_time, label: 'Avg. Edit Time', color: 'text-purple-600' },
+        ]);
+
+        // Fetch featured templates (first 6)
+        const templates = await apiService.getTemplates({ limit: 6 });
+        setFeaturedTemplates(templates);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-full">
