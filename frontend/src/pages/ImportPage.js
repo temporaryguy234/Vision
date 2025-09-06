@@ -437,6 +437,12 @@ const ImportPage = () => {
                             Error: {file.error}
                           </div>
                         )}
+                        
+                        {file.status === 'duplicate' && (
+                          <div className="mt-2 text-sm text-yellow-600">
+                            This file already exists in the library
+                          </div>
+                        )}
                       </div>
                     </div>
 
