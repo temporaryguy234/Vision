@@ -157,17 +157,27 @@ const EditorPage = () => {
           <div className="max-w-4xl mx-auto">
             <div className="bg-black rounded-lg aspect-video relative overflow-hidden shadow-2xl">
               {/* Preview Canvas */}
-              <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <h1 className="text-4xl font-bold mb-4">Your Amazing Project</h1>
-                  <p className="text-xl opacity-90">Professional Motion Graphics</p>
-                  
-                  {/* Mock logo */}
-                  <div className="mt-8 w-16 h-16 bg-white/20 rounded-full mx-auto flex items-center justify-center">
-                    <span className="text-2xl">🚀</span>
+              {loading ? (
+                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                  <div className="text-white">Loading template...</div>
+                </div>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <h1 className="text-4xl font-bold mb-4">
+                      {template?.title || 'Your Amazing Project'}
+                    </h1>
+                    <p className="text-xl opacity-90">
+                      {template?.description || 'Professional Motion Graphics'}
+                    </p>
+                    
+                    {/* Mock logo */}
+                    <div className="mt-8 w-16 h-16 bg-white/20 rounded-full mx-auto flex items-center justify-center">
+                      <span className="text-2xl">🚀</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
               {/* Selection indicators */}
               {selectedElement && (
