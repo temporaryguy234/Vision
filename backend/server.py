@@ -329,7 +329,7 @@ async def create_template_asset(template_id: str, asset: TemplateAssetCreate):
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    asset_dict = asset.dict()
+    asset_dict = asset.model_dump()
     asset_obj = TemplateAsset(**asset_dict)
     
     await db.template_assets.insert_one(asset_obj.model_dump())
