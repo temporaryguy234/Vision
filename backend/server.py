@@ -534,8 +534,8 @@ async def create_export(export_data: ExportCreate):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    export_obj = Export(**export_data.dict())
-    await db.exports.insert_one(export_obj.dict())
+    export_obj = Export(**export_data.model_dump())
+    await db.exports.insert_one(export_obj.model_dump())
     
     # Here you would typically queue the export job for background processing
     # For now, we'll just return the export record
