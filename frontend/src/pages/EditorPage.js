@@ -227,8 +227,15 @@ const EditorPage = () => {
           {commandHistory.length > 0 && (
             <div className="mt-4 space-y-2 max-h-32 overflow-y-auto">
               {commandHistory.slice(-3).map((cmd) => (
-                <div key={cmd.id} className="text-xs bg-gray-50 p-2 rounded">
-                  <div className="font-medium text-gray-900">{cmd.command}</div>
+                <div key={cmd.id} className={`text-xs p-2 rounded ${
+                  cmd.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                }`}>
+                  <div className={`font-medium ${
+                    cmd.success ? 'text-green-900' : 'text-red-900'
+                  }`}>{cmd.command}</div>
+                  <div className={`${
+                    cmd.success ? 'text-green-600' : 'text-red-600'
+                  }`}>{cmd.message}</div>
                   <div className="text-gray-500">{cmd.timestamp}</div>
                 </div>
               ))}
