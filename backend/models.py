@@ -109,7 +109,7 @@ class TextElementParameters(BaseModel):
 
 class ImageElementParameters(BaseModel):
     source_url: Optional[str] = Field(description="Image source URL")
-    fit: str = Field(default="cover", regex=r"^(cover|contain)$")
+    fit: str = Field(default="cover", pattern=r"^(cover|contain)$")
     opacity: float = Field(default=1.0, ge=0.0, le=1.0)
     x: float = Field(default=50.0, ge=0.0, le=100.0, description="X position as percentage")
     y: float = Field(default=50.0, ge=0.0, le=100.0, description="Y position as percentage")
