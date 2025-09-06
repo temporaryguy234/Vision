@@ -114,6 +114,21 @@ export const apiService = {
     });
     return response.data;
   },
+
+  // Bulk Import
+  async bulkImportUpload(formData) {
+    const response = await api.post('/bulk-import/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async bulkImportCreateTemplates(templateData) {
+    const response = await api.post('/bulk-import/create-templates', templateData);
+    return response.data;
+  },
 };
 
 // Error interceptor
