@@ -54,7 +54,7 @@ const LottieRenderer = ({
         // Handle embedded animations via API
         if (sourceUrl.startsWith('embedded://')) {
           const animationId = sourceUrl.replace('embedded://', '');
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/lottiefiles/animation/${animationId}/data`);
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/lottiefiles/animation/${animationId}/data`);
           if (!response.ok) {
             throw new Error(`Failed to load embedded animation: ${response.status}`);
           }
