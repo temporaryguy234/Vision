@@ -233,7 +233,7 @@ async def seed_database():
                     x=50.0,
                     y=65.0,
                     entrance_animation=EntranceAnimation(
-                        type=AnimationType.SLIDE_IN_BOTTOM,
+                        type=AnimationType.FLY_IN_BOTTOM,
                         delay=2.0,
                         duration=0.8,
                         easing=EasingType.EASE_OUT
