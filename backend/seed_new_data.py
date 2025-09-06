@@ -432,6 +432,8 @@ async def seed_database():
             file_url="/uploads/images/png/template_003/logo-placeholder.png",
             width=300,
             height=300,
+            duration=None,
+            frame_rate=None,
             file_size=45000
         ),
         
