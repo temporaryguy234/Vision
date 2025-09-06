@@ -312,11 +312,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "LottieFiles Search Endpoint"
-    - "LottieFiles Categories Endpoint"
-    - "LottieFiles Popular Animations Endpoint"
-    - "LottieFiles Animation Details Endpoint"
-    - "LottieFiles Import Endpoint"
+    - "LottieFiles Animation Data Endpoint"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
