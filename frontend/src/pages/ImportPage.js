@@ -265,6 +265,137 @@ const ImportPage = () => {
           </div>
         </div>
 
+        {/* Bulk Import Wizard Modal */}
+        {showWizard && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-900">Create Templates</h2>
+                <p className="text-gray-600 mt-1">
+                  Review and customize your templates before adding them to the library
+                </p>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {wizardData.map((item, index) => (
+                  <div key={index} className="border border-gray-200 rounded-xl p-6">
+                    <div className="flex items-start space-x-4">
+                      <img
+                        src={item.thumbnail_url || "https://via.placeholder.com/100x80?text=No+Preview"}
+                        alt="Preview"
+                        className="w-20 h-16 object-cover rounded-lg border border-gray-200"
+                      />
+                      
+                      <div className="flex-1 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Template Title
+                            </label>
+                            <input
+                              type="text"
+                              value={item.templateTitle || item.name.replace(/\.[^/.]+$/, "")}
+                              onChange={(e) => {
+                                const newData = [...wizardData];
+                                newData[index] = { ...newData[index], templateTitle: e.target.value };
+                                setWizardData(newData);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Category
+                            </label>
+                            <select
+                              value={item.category || "MISCELLANEOUS"}
+                              onChange={(e) => {
+                                const newData = [...wizardData];
+                                newData[index] = { ...newData[index], category: e.target.value };
+                                setWizardData(newData);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+                            >
+                              <option value="INTROS_OUTROS">Intros & Outros</option>
+                              <option value="LOWER_THIRDS">Lower Thirds</option>
+                              <option value="TITLES_QUOTES">Titles & Quotes</option>
+                              <option value="CHARTS_MAPS">Charts & Maps</option>
+                              <option value="SOCIAL_MEDIA">Social Media Posts</option>
+                              <option value="ADS_PROMOS">Ads & Promos</option>
+                              <option value="OVERLAYS">Overlays</option>
+                              <option value="ANIMATED_ICONS">Animated Icons</option>
+                              <option value="MISCELLANEOUS">Miscellaneous</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Tags (comma-separated)
+                          </label>
+                          <input
+                            type="text"
+                            value={item.tags || ""}
+                            onChange={(e) => {
+                              const newData = [...wizardData];
+                              newData[index] = { ...newData[index], tags: e.target.value };
+                              setWizardData(newData);
+                            }}
+                            placeholder="animation, logo, intro"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`public-${index}`}
+                            checked={item.is_public !== false}
+                            onChange={(e) => {
+                              const newData = [...wizardData];
+                              newData[index] = { ...newData[index], is_public: e.target.checked };
+                              setWizardData(newData);
+                            }}
+                            className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <label htmlFor={`public-${index}`} className="ml-2 text-sm text-gray-700">
+                            Make this template public
+                          </label>
+                        </div>
+                        
+                        <div className="text-sm text-gray-500">
+                          <span className="font-medium">Type:</span> {item.type} •{' '}
+                          <span className="font-medium">Size:</span> {item.size}
+                          {item.metadata?.width && item.metadata?.height && (
+                            <> • <span className="font-medium">Dimensions:</span> {item.metadata.width}×{item.metadata.height}</>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowWizard(false)}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                
+                <button
+                  onClick={handleCreateTemplates}
+                  className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
+                >
+                  Create {wizardData.length} Template{wizardData.length !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Upload History */}
         {uploadedFiles.length > 0 && (
           <div className="mt-8">
