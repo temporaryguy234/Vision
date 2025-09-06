@@ -556,7 +556,7 @@ async def seed_database():
     
     # Insert projects
     for project in projects:
-        await db.projects.insert_one(project.dict())
+        await db.projects.insert_one(project.model_dump())
     
     print(f"✅ Seeded {len(projects)} projects")
     
