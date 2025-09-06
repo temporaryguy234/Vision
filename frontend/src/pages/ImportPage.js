@@ -260,7 +260,7 @@ const ImportPage = () => {
           <input
             type="file"
             multiple
-            accept=".json,.mp4,.gif,.webm,.mov,.png,.svg"
+            accept=".json,.mp4,.gif,.webm,.mov,.png,.svg,.lottie,.aep"
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             disabled={isUploading}
             onChange={(e) => {
