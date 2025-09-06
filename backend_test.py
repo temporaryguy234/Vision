@@ -1027,9 +1027,17 @@ def main():
         tester.test_lottiefiles_popular_with_category()
         tester.test_lottiefiles_animation_details_valid()
         tester.test_lottiefiles_animation_details_invalid()
+        
+        # Test the specific animation data endpoint (focus of this review)
+        print("\n🎯 LOTTIEFILES ANIMATION DATA TESTS (REVIEW FOCUS)")
+        print("-" * 50)
+        tester.test_lottiefiles_animation_data_endpoint()
+        tester.test_lottiefiles_embedded_url_handling()
+        
         tester.test_lottiefiles_import_animation()
         tester.test_lottiefiles_import_invalid_animation()
         tester.test_lottiefiles_import_with_category()
+        tester.test_lottiefiles_import_with_data_verification()
         
     finally:
         # Clean up test files
