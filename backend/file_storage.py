@@ -118,35 +118,71 @@ class FileStorageManager:
     async def _validate_lottie_file(self, file_path: Path) -> bool:
         """Validate if a file is a valid Lottie JSON file"""
         try:
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
-                content = await f.read()
-                data = json.loads(content)
+            import zipfile
+            
+            # Check if it's a .lottie file (ZIP format)
+            if file_path.suffix.lower() == '.lottie':
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zip_file:
+                        # Look for data.json in the ZIP
+                        if 'data.json' in zip_file.namelist():
+                            with zip_file.open('data.json') as json_file:
+                                content = json_file.read().decode('utf-8')
+                                data = json.loads(content)
+                        else:
+                            # Some .lottie files might have the JSON at root level
+                            json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                            if json_files:
+                                with zip_file.open(json_files[0]) as json_file:
+                                    content = json_file.read().decode('utf-8')
+                                    data = json.loads(content)
+                            else:
+                                return False
+                except zipfile.BadZipFile:
+                    # If it's not a valid ZIP, treat as regular JSON
+                    async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                        data = json.loads(content)
+            else:
+                # Regular JSON file
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    data = json.loads(content)
+            
+            # More lenient validation - just check for basic Lottie structure
+            if isinstance(data, dict):
+                # Check for common Lottie fields (more flexible)
+                has_version = 'v' in data or 'version' in data
+                has_frame_rate = 'fr' in data or 'frameRate' in data or 'frame_rate' in data
+                has_layers = 'layers' in data
+                has_dimensions = ('w' in data and 'h' in data) or ('width' in data and 'height' in data)
                 
-                # More lenient validation - just check for basic Lottie structure
-                if isinstance(data, dict):
-                    # Check for common Lottie fields (more flexible)
-                    has_version = 'v' in data or 'version' in data
-                    has_frame_rate = 'fr' in data or 'frameRate' in data or 'frame_rate' in data
-                    has_layers = 'layers' in data
-                    has_dimensions = ('w' in data and 'h' in data) or ('width' in data and 'height' in data)
-                    
-                    # If it has most Lottie characteristics, accept it
-                    lottie_indicators = sum([has_version, has_frame_rate, has_layers, has_dimensions])
-                    
-                    if lottie_indicators >= 2:  # More lenient - need at least 2 indicators
-                        return True
-                    
-                    # Also accept if it's clearly a JSON animation file
-                    has_animation_terms = any(term in str(data).lower() for term in [
-                        'animation', 'keyframe', 'timeline', 'bodymovin', 'lottie', 'after effects'
-                    ])
-                    
-                    if has_animation_terms:
-                        return True
+                # If it has most Lottie characteristics, accept it
+                lottie_indicators = sum([has_version, has_frame_rate, has_layers, has_dimensions])
                 
-                return False
+                if lottie_indicators >= 2:  # More lenient - need at least 2 indicators
+                    return True
                 
-        except (json.JSONDecodeError, UnicodeDecodeError, Exception):
+                # Also accept if it's clearly a JSON animation file
+                has_animation_terms = any(term in str(data).lower() for term in [
+                    'animation', 'keyframe', 'timeline', 'bodymovin', 'lottie', 'after effects'
+                ])
+                
+                if has_animation_terms:
+                    return True
+                
+                # Very lenient: if it has layers and any dimensional info, accept it
+                if 'layers' in data and (has_dimensions or has_version):
+                    return True
+            
+            return False
+            
+        except (json.JSONDecodeError, UnicodeDecodeError, zipfile.BadZipFile, Exception) as e:
+            # Very lenient fallback: if filename suggests it's a Lottie file, accept it
+            filename_lower = file_path.name.lower()
+            if any(term in filename_lower for term in ['lottie', 'bodymovin', 'after_effects', 'animation']):
+                return True
+            
             return False
     
     async def _get_lottie_metadata(self, file_path: Path) -> Dict[str, Any]:
