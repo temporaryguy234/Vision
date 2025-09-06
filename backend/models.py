@@ -236,8 +236,8 @@ class Project(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     status: ProjectStatus = ProjectStatus.DRAFT
     current_editor_state: Dict[str, Any] = Field(default={}, description="User's current edits and modifications")
-    thumbnail_url: Optional[str] = Field(description="Generated thumbnail for the project")
-    duration: Optional[float] = Field(ge=0.0, description="Project duration in seconds")
+    thumbnail_url: Optional[str] = Field(default=None, description="Generated thumbnail for the project")
+    duration: Optional[float] = Field(default=None, ge=0.0, description="Project duration in seconds")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
