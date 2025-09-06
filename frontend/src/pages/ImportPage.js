@@ -186,7 +186,7 @@ const ImportPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Import Motion Graphics</h1>
           <p className="text-gray-600">Upload your motion graphics files from any tool - After Effects, Photoshop, web tools, or any other software</p>
         </div>
-            {/* Upload Area */}
+        {/* Upload Area */}
 
         {/* Upload Area */}
         <div
