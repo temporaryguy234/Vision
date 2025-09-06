@@ -60,6 +60,7 @@ class ElementType(str, Enum):
     SHAPE = "shape"
     CHART = "chart"
     MAP = "map"
+    LOTTIE = "lottie"
 
 class ChartType(str, Enum):
     LINE = "line"
