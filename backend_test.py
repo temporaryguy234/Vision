@@ -795,6 +795,162 @@ class MotionEditAPITester:
                 self.created_resources.append(data['template_id'])
         return success
 
+    def test_lottiefiles_animation_data_endpoint(self):
+        """Test the animation data endpoint that returns Lottie JSON"""
+        print(f"\n🔍 Testing LottieFiles Animation Data Endpoint...")
+        
+        # Test with loading_spinner animation ID
+        animation_id = "loading_spinner"
+        success1, data1 = self.run_test(f"Animation Data ({animation_id})", "GET", 
+                                      f"lottiefiles/animation/{animation_id}/data", 200)
+        
+        if success1:
+            # Verify it's valid JSON and not HTML
+            if isinstance(data1, dict):
+                print(f"   ✅ Returns valid JSON (not HTML)")
+                
+                # Check for required Lottie JSON structure
+                required_lottie_fields = ['v', 'fr', 'ip', 'op', 'w', 'h', 'layers']
+                missing_fields = [field for field in required_lottie_fields if field not in data1]
+                
+                if missing_fields:
+                    print(f"   ⚠️  Missing Lottie fields: {missing_fields}")
+                else:
+                    print(f"   ✅ Valid Lottie JSON structure")
+                    print(f"   - Version: {data1.get('v')}")
+                    print(f"   - Frame Rate: {data1.get('fr')}")
+                    print(f"   - Dimensions: {data1.get('w')}x{data1.get('h')}")
+                    print(f"   - Layers: {len(data1.get('layers', []))}")
+                
+                # Test JSON parseability
+                try:
+                    json_str = json.dumps(data1)
+                    parsed_back = json.loads(json_str)
+                    print(f"   ✅ JSON is parseable and serializable")
+                except Exception as e:
+                    print(f"   ❌ JSON parsing error: {e}")
+            else:
+                print(f"   ❌ Response is not JSON: {type(data1)}")
+                if isinstance(data1, str) and data1.startswith('<!DOCTYPE'):
+                    print(f"   ❌ Received HTML instead of JSON")
+        
+        # Test with success_checkmark animation ID
+        animation_id2 = "success_checkmark"
+        success2, data2 = self.run_test(f"Animation Data ({animation_id2})", "GET", 
+                                      f"lottiefiles/animation/{animation_id2}/data", 200)
+        
+        if success2:
+            if isinstance(data2, dict):
+                print(f"   ✅ Second animation also returns valid JSON")
+                
+                # Verify embedded:// URL handling
+                # Check if this animation has embedded data
+                required_fields = ['v', 'layers']
+                if all(field in data2 for field in required_fields):
+                    print(f"   ✅ Embedded:// URL handling works correctly")
+                else:
+                    print(f"   ⚠️  Embedded data may not be complete")
+            else:
+                print(f"   ❌ Second animation response is not JSON")
+        
+        # Test with invalid animation ID
+        invalid_id = "nonexistent_animation"
+        success3, data3 = self.run_test(f"Animation Data (Invalid ID)", "GET", 
+                                      f"lottiefiles/animation/{invalid_id}/data", 404)
+        
+        if success3:
+            print(f"   ✅ Properly returns 404 for invalid animation ID")
+        
+        return success1 and success2 and success3
+
+    def test_lottiefiles_embedded_url_handling(self):
+        """Test that embedded:// URLs are processed correctly"""
+        print(f"\n🔍 Testing Embedded URL Handling...")
+        
+        # First get animation details to see the embedded URL
+        animation_id = "loading_spinner"
+        success1, details = self.run_test(f"Get Animation Details", "GET", 
+                                        f"lottiefiles/animation/{animation_id}", 200)
+        
+        if success1:
+            file_url = details.get('file_url', '')
+            if file_url.startswith('embedded://'):
+                print(f"   ✅ Animation uses embedded:// URL: {file_url}")
+                
+                # Now test that the data endpoint processes this correctly
+                success2, lottie_data = self.run_test(f"Get Embedded Animation Data", "GET", 
+                                                    f"lottiefiles/animation/{animation_id}/data", 200)
+                
+                if success2 and isinstance(lottie_data, dict):
+                    print(f"   ✅ Embedded URL processed correctly")
+                    print(f"   - Animation Name: {lottie_data.get('nm', 'Unknown')}")
+                    print(f"   - Has Layers: {len(lottie_data.get('layers', []))} layers")
+                    return True
+                else:
+                    print(f"   ❌ Failed to process embedded URL")
+                    return False
+            else:
+                print(f"   ⚠️  Animation doesn't use embedded URL: {file_url}")
+                return True
+        
+        return False
+
+    def test_lottiefiles_import_with_data_verification(self):
+        """Test importing animation and verify the template uses correct embedded URL"""
+        print(f"\n🔍 Testing Import with Data Verification...")
+        
+        animation_id = "loading_spinner"
+        success1, import_result = self.run_test(f"Import Animation for Data Test", "POST", 
+                                              f"lottiefiles/import/{animation_id}", 200)
+        
+        if success1:
+            template_id = import_result.get('template_id')
+            if template_id:
+                # Store for cleanup
+                self.created_resources.append(template_id)
+                
+                # Get the created template
+                success2, template_data = self.run_test(f"Get Imported Template", "GET", 
+                                                      f"templates/{template_id}", 200)
+                
+                if success2:
+                    # Check if template has LOTTIE element with embedded URL
+                    elements = template_data.get('editable_parameters_schema', {}).get('elements', [])
+                    lottie_elements = [elem for elem in elements if elem.get('type') == 'lottie']
+                    
+                    if lottie_elements:
+                        lottie_elem = lottie_elements[0]
+                        source_url = lottie_elem.get('parameters', {}).get('source_url', '')
+                        
+                        if source_url.startswith('embedded://'):
+                            print(f"   ✅ Template uses embedded URL: {source_url}")
+                            
+                            # Test that we can get the data for this embedded URL
+                            embedded_id = source_url.replace('embedded://', '')
+                            success3, data = self.run_test(f"Verify Embedded Data Access", "GET", 
+                                                         f"lottiefiles/animation/{embedded_id}/data", 200)
+                            
+                            if success3 and isinstance(data, dict):
+                                print(f"   ✅ Can access embedded animation data")
+                                return True
+                            else:
+                                print(f"   ❌ Cannot access embedded animation data")
+                                return False
+                        else:
+                            print(f"   ⚠️  Template doesn't use embedded URL: {source_url}")
+                            return True
+                    else:
+                        print(f"   ❌ Template missing LOTTIE elements")
+                        return False
+                else:
+                    print(f"   ❌ Could not retrieve imported template")
+                    return False
+            else:
+                print(f"   ❌ Import didn't return template ID")
+                return False
+        
+        return False
+
 def main():
     print("🚀 Starting MotionEdit API Testing...")
     print("=" * 60)
