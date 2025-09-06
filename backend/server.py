@@ -363,7 +363,7 @@ async def upload_template_asset(
     }
     
     asset_obj = TemplateAsset(**asset_data)
-    await db.template_assets.insert_one(asset_obj.dict())
+    await db.template_assets.insert_one(asset_obj.model_dump())
     
     return asset_obj
 
