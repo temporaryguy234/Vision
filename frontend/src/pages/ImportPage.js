@@ -135,6 +135,21 @@ const ImportPage = () => {
     }
   };
 
+  const handleLottieFilesImport = (result) => {
+    // Add to upload history as successfully created template
+    const newFile = {
+      id: Date.now(),
+      name: result.template_title,
+      type: 'Lottie JSON',
+      size: 'From LottieFiles',
+      status: 'template_created',
+      template_id: result.template_id,
+      category: result.category
+    };
+    
+    setUploadedFiles(prev => [newFile, ...prev]);
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'success':
