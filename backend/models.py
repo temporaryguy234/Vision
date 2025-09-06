@@ -310,8 +310,8 @@ class TemplateAssetCreate(BaseModel):
     file_url: str
     width: Optional[int] = Field(ge=1)
     height: Optional[int] = Field(ge=1)
-    duration: Optional[float] = Field(ge=0.0)
-    frame_rate: Optional[int] = Field(ge=1, le=120)
+    duration: Optional[float] = Field(default=None, ge=0.0)
+    frame_rate: Optional[int] = Field(default=None, ge=1, le=120)
     file_size: int = Field(ge=0)
     file_hash: Optional[str]
 
