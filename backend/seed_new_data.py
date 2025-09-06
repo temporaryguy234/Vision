@@ -185,7 +185,7 @@ async def seed_database():
                         type=AnimationType.FADE_IN,
                         delay=1.0,
                         duration=1.0,
-                        easing=EasingType.EASE_IN_OUT
+                        easing=EasingType.EASE
                     )
                 )
             )
