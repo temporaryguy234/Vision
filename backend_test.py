@@ -511,7 +511,7 @@ class MotionEditAPITester:
         # Create a template with LOTTIE element
         template_data = {
             "title": f"Lottie Test Template {datetime.now().strftime('%H%M%S')}",
-            "category": "MISCELLANEOUS",
+            "category": "Miscellaneous",
             "tags": ["lottie", "test"],
             "preview_image_url": "https://placeholder.com/300x200",
             "creator_id": "test_lottie_validation",
