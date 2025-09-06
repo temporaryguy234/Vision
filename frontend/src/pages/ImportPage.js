@@ -449,13 +449,34 @@ const ImportPage = () => {
                     <div className="flex items-center space-x-3">
                       {getStatusIcon(file.status)}
                       
-                      {file.status === 'completed' && (
-                        <button className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                          Add to Library
+                      {file.status === 'success' && (
+                        <button 
+                          onClick={() => {
+                            setWizardData([file]);
+                            setShowWizard(true);
+                          }}
+                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Create Template
                         </button>
                       )}
                       
-                      {file.status === 'failed' && (
+                      {file.status === 'template_created' && (
+                        <button 
+                          onClick={() => window.open(`/editor/${file.template_id}`, '_blank')}
+                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                        >
+                          Edit Template
+                        </button>
+                      )}
+                      
+                      {file.status === 'duplicate' && (
+                        <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                          View Existing
+                        </button>
+                      )}
+                      
+                      {file.status === 'error' && (
                         <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                           Retry
                         </button>
