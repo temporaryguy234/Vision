@@ -39,7 +39,7 @@ class LottieFilesService:
         self.logger = logging.getLogger(__name__)
         self._session: Optional[aiohttp.ClientSession] = None
         
-        # Curated list of high-quality Lottie animations
+        # Curated list of working Lottie animations with embedded JSON data
         self.curated_animations = [
             {
                 "id": "loading_spinner",
@@ -47,10 +47,60 @@ class LottieFilesService:
                 "description": "Elegant loading animation",
                 "category": "loading",
                 "tags": ["loading", "spinner", "progress"],
-                "file_url": "https://lottie.host/4f8c5972-0e6c-4666-8d3d-7a7ad6b49138/FApNKFZP0D.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/1795-loading-icon.gif",
+                "file_url": "embedded://loading_spinner",
+                "thumbnail_url": "https://assets5.lottiefiles.com/packages/lf20_t9gkkhz4.json",
                 "duration": 2.0,
-                "dimensions": {"width": 400, "height": 400}
+                "dimensions": {"width": 400, "height": 400},
+                "lottie_data": {
+                    "v": "5.7.4",
+                    "fr": 30,
+                    "ip": 0,
+                    "op": 60,
+                    "w": 400,
+                    "h": 400,
+                    "nm": "Loading Spinner",
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ddd": 0,
+                            "ind": 1,
+                            "ty": 4,
+                            "nm": "Spinner",
+                            "sr": 1,
+                            "ks": {
+                                "o": {"a": 0, "k": 100},
+                                "r": {"a": 1, "k": [{"i": {"x": [0.833], "y": [0.833]}, "o": {"x": [0.167], "y": [0.167]}, "t": 0, "s": [0]}, {"t": 59, "s": [360]}]},
+                                "p": {"a": 0, "k": [200, 200, 0]},
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]}
+                            },
+                            "ao": 0,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {
+                                            "ty": "el",
+                                            "p": {"a": 0, "k": [0, 0]},
+                                            "s": {"a": 0, "k": [100, 100]}
+                                        },
+                                        {
+                                            "ty": "st",
+                                            "c": {"a": 0, "k": [1, 0.5, 0, 1]},
+                                            "o": {"a": 0, "k": 100},
+                                            "w": {"a": 0, "k": 8}
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ip": 0,
+                            "op": 60,
+                            "st": 0,
+                            "bm": 0
+                        }
+                    ]
+                }
             },
             {
                 "id": "success_checkmark",
@@ -58,54 +108,196 @@ class LottieFilesService:
                 "description": "Animated success confirmation",
                 "category": "success",
                 "tags": ["success", "check", "done", "complete"],
-                "file_url": "https://lottie.host/a5e0f66f-dc30-4cc7-bee4-d14e7f8ae5e2/JnMcAiIUaN.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/2634-success-check.gif",
+                "file_url": "embedded://success_checkmark",
+                "thumbnail_url": "https://assets9.lottiefiles.com/packages/lf20_jbrw3hcz.json",
                 "duration": 1.5,
-                "dimensions": {"width": 400, "height": 400}
+                "dimensions": {"width": 400, "height": 400},
+                "lottie_data": {
+                    "v": "5.7.4",
+                    "fr": 30,
+                    "ip": 0,
+                    "op": 45,
+                    "w": 400,
+                    "h": 400,
+                    "nm": "Success Check",
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ddd": 0,
+                            "ind": 1,
+                            "ty": 4,
+                            "nm": "Check",
+                            "sr": 1,
+                            "ks": {
+                                "o": {"a": 0, "k": 100},
+                                "r": {"a": 0, "k": 0},
+                                "p": {"a": 0, "k": [200, 200, 0]},
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 1, "k": [{"t": 0, "s": [0, 0, 100]}, {"t": 30, "s": [120, 120, 100]}]}
+                            },
+                            "ao": 0,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {
+                                            "ty": "sh",
+                                            "ks": {
+                                                "a": 0,
+                                                "k": {
+                                                    "i": [[0,0],[0,0],[0,0]],
+                                                    "o": [[0,0],[0,0],[0,0]],
+                                                    "v": [[-30,0],[0,20],[40,-20]],
+                                                    "c": False
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "ty": "st",
+                                            "c": {"a": 0, "k": [0, 0.8, 0, 1]},
+                                            "o": {"a": 0, "k": 100},
+                                            "w": {"a": 0, "k": 12},
+                                            "lc": 2
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ip": 0,
+                            "op": 45,
+                            "st": 0,
+                            "bm": 0
+                        }
+                    ]
+                }
             },
             {
                 "id": "business_growth",
-                "name": "Business Growth",
-                "description": "Chart showing business growth",
+                "name": "Business Growth Chart",
+                "description": "Animated business growth chart",
                 "category": "business",
                 "tags": ["business", "growth", "chart", "analytics"],
-                "file_url": "https://lottie.host/5b7c1d3a-c8b2-4ed7-a9b5-fb3f2a1e0c2d/BusinessGrowth.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/business-growth.gif",
+                "file_url": "embedded://business_growth",
+                "thumbnail_url": "https://assets4.lottiefiles.com/packages/lf20_qp1spzqv.json",
                 "duration": 3.0,
-                "dimensions": {"width": 400, "height": 400}
+                "dimensions": {"width": 400, "height": 400},
+                "lottie_data": {
+                    "v": "5.7.4",
+                    "fr": 30,
+                    "ip": 0,
+                    "op": 90,
+                    "w": 400,
+                    "h": 400,
+                    "nm": "Business Chart",
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ddd": 0,
+                            "ind": 1,
+                            "ty": 4,
+                            "nm": "Chart",
+                            "sr": 1,
+                            "ks": {
+                                "o": {"a": 0, "k": 100},
+                                "r": {"a": 0, "k": 0},
+                                "p": {"a": 0, "k": [200, 200, 0]},
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]}
+                            },
+                            "ao": 0,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {
+                                            "ty": "rc",
+                                            "p": {"a": 0, "k": [-50, 20]},
+                                            "s": {"a": 1, "k": [{"t": 0, "s": [20, 0]}, {"t": 60, "s": [20, 40]}]},
+                                            "r": {"a": 0, "k": 4}
+                                        },
+                                        {
+                                            "ty": "fl",
+                                            "c": {"a": 0, "k": [0.2, 0.6, 1, 1]},
+                                            "o": {"a": 0, "k": 100}
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ip": 0,
+                            "op": 90,
+                            "st": 0,
+                            "bm": 0
+                        }
+                    ]
+                }
             },
             {
-                "id": "social_media",
-                "name": "Social Media Icons",
-                "description": "Animated social media icons",
+                "id": "heart_like",
+                "name": "Heart Like Animation",
+                "description": "Social media heart like animation",
                 "category": "social",
-                "tags": ["social", "media", "icons", "network"],
-                "file_url": "https://lottie.host/9c8d7e6f-a1b2-4f5e-8d9c-1a2b3c4d5e6f/SocialMedia.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/social-media.gif",
-                "duration": 2.5,
-                "dimensions": {"width": 400, "height": 400}
-            },
-            {
-                "id": "tech_innovation",
-                "name": "Tech Innovation",
-                "description": "Technology and innovation animation",
-                "category": "technology",
-                "tags": ["technology", "innovation", "digital", "future"],
-                "file_url": "https://lottie.host/1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d/TechInnovation.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/tech-innovation.gif",
-                "duration": 4.0,
-                "dimensions": {"width": 400, "height": 400}
-            },
-            {
-                "id": "education_learning",
-                "name": "Education & Learning",
-                "description": "Educational animation with books and graduation",
-                "category": "education",
-                "tags": ["education", "learning", "books", "school"],
-                "file_url": "https://lottie.host/6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c/Education.json",
-                "thumbnail_url": "https://cdn.lottiefiles.com/images/education.gif",
-                "duration": 3.5,
-                "dimensions": {"width": 400, "height": 400}
+                "tags": ["social", "like", "heart", "interaction"],
+                "file_url": "embedded://heart_like",
+                "thumbnail_url": "https://assets1.lottiefiles.com/packages/lf20_d1iq6oo3.json",
+                "duration": 1.8,
+                "dimensions": {"width": 400, "height": 400},
+                "lottie_data": {
+                    "v": "5.7.4",
+                    "fr": 30,
+                    "ip": 0,
+                    "op": 54,
+                    "w": 400,
+                    "h": 400,
+                    "nm": "Heart Like",
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ddd": 0,
+                            "ind": 1,
+                            "ty": 4,
+                            "nm": "Heart",
+                            "sr": 1,
+                            "ks": {
+                                "o": {"a": 0, "k": 100},
+                                "r": {"a": 0, "k": 0},
+                                "p": {"a": 0, "k": [200, 200, 0]},
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 1, "k": [{"t": 0, "s": [80, 80, 100]}, {"t": 15, "s": [120, 120, 100]}, {"t": 30, "s": [100, 100, 100]}]}
+                            },
+                            "ao": 0,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {
+                                            "ty": "sh",
+                                            "ks": {
+                                                "a": 0,
+                                                "k": {
+                                                    "i": [[0,0],[-10,-10],[0,-15],[10,-10],[20,0],[10,10],[0,15],[-10,10],[-20,0]],
+                                                    "o": [[10,10],[10,-10],[0,-15],[-10,-10],[-20,0],[-10,10],[0,15],[10,10],[0,0]],
+                                                    "v": [[0,25],[15,10],[25,-10],[15,-25],[-15,-25],[-25,-10],[-25,10],[-15,25],[0,35]],
+                                                    "c": True
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "ty": "fl",
+                                            "c": {"a": 0, "k": [1, 0.2, 0.4, 1]},
+                                            "o": {"a": 0, "k": 100}
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ip": 0,
+                            "op": 54,
+                            "st": 0,
+                            "bm": 0
+                        }
+                    ]
+                }
             }
         ]
     
