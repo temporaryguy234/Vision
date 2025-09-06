@@ -151,8 +151,8 @@ class ChartElementParameters(BaseModel):
 
 class MapElementParameters(BaseModel):
     focus_region: str = Field(default="world", description="Geographic focus (world, country code, region)")
-    land_color: str = Field(default="#10B981", regex=r"^#[0-9A-Fa-f]{6}$")
-    border_color: str = Field(default="#374151", regex=r"^#[0-9A-Fa-f]{6}$")
+    land_color: str = Field(default="#10B981", pattern=r"^#[0-9A-Fa-f]{6}$")
+    border_color: str = Field(default="#374151", pattern=r"^#[0-9A-Fa-f]{6}$")
     border_width: int = Field(default=1, ge=0, le=12, description="Border width in pixels")
     show_labels: bool = Field(default=True)
     x: float = Field(default=50.0, ge=0.0, le=100.0, description="X position as percentage")
