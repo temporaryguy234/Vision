@@ -116,17 +116,37 @@ class FileStorageManager:
             return 30  # Default frame rate
     
     async def _validate_lottie_file(self, file_path: Path) -> bool:
-        """Validate that a JSON file is a valid Lottie animation"""
+        """Validate if a file is a valid Lottie JSON file"""
         try:
-            async with aiofiles.open(file_path, 'r') as f:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
                 content = await f.read()
                 data = json.loads(content)
                 
-                # Basic Lottie validation - check for required fields
-                required_fields = ['v', 'fr', 'ip', 'op', 'w', 'h', 'layers']
-                return all(field in data for field in required_fields)
-        except Exception as e:
-            print(f"Error validating Lottie file: {e}")
+                # More lenient validation - just check for basic Lottie structure
+                if isinstance(data, dict):
+                    # Check for common Lottie fields (more flexible)
+                    has_version = 'v' in data or 'version' in data
+                    has_frame_rate = 'fr' in data or 'frameRate' in data or 'frame_rate' in data
+                    has_layers = 'layers' in data
+                    has_dimensions = ('w' in data and 'h' in data) or ('width' in data and 'height' in data)
+                    
+                    # If it has most Lottie characteristics, accept it
+                    lottie_indicators = sum([has_version, has_frame_rate, has_layers, has_dimensions])
+                    
+                    if lottie_indicators >= 2:  # More lenient - need at least 2 indicators
+                        return True
+                    
+                    # Also accept if it's clearly a JSON animation file
+                    has_animation_terms = any(term in str(data).lower() for term in [
+                        'animation', 'keyframe', 'timeline', 'bodymovin', 'lottie', 'after effects'
+                    ])
+                    
+                    if has_animation_terms:
+                        return True
+                
+                return False
+                
+        except (json.JSONDecodeError, UnicodeDecodeError, Exception):
             return False
     
     async def _get_lottie_metadata(self, file_path: Path) -> Dict[str, Any]:
