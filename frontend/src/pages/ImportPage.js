@@ -233,51 +233,52 @@ const ImportPage = () => {
           />
         </div>
 
-        {/* Supported Formats */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mr-4">
-                <FileVideo className="w-6 h-6 text-blue-600" />
+        {/* Supported Motion Graphics Formats */}
+        <div className="mt-8">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">Supported Motion Graphics Formats</h3>
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Animation Files */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+              <div className="flex items-center mb-3">
+                <FileVideo className="w-6 h-6 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-gray-900">Animation Files</h4>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Video Files</h3>
-                <p className="text-sm text-gray-600">MP4, WebM, MOV</p>
-              </div>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li>• <strong>Lottie JSON</strong> - From After Effects Bodymovin</li>
+                <li>• <strong>Video</strong> - MP4, WebM, MOV, AVI</li>
+                <li>• <strong>GIF</strong> - From Photoshop or web tools</li>
+                <li>• <strong>APNG</strong> - Animated PNG sequences</li>
+              </ul>
             </div>
-            <p className="text-sm text-gray-600">
-              Upload your rendered motion graphics videos. We'll automatically extract keyframes and create editable parameters.
-            </p>
-          </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-purple-200 rounded-xl flex items-center justify-center mr-4">
-                <Image className="w-6 h-6 text-purple-600" />
+            {/* Design Files */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-100">
+              <div className="flex items-center mb-3">
+                <Image className="w-6 h-6 text-green-600 mr-2" />
+                <h4 className="font-semibold text-gray-900">Design Files</h4>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Animated Images</h3>
-                <p className="text-sm text-gray-600">GIF, APNG</p>
-              </div>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li>• <strong>SVG</strong> - Vector animations</li>
+                <li>• <strong>PNG/JPG</strong> - Static images</li>
+                <li>• <strong>Image Sequences</strong> - Multiple PNGs</li>
+                <li>• <strong>Vector Graphics</strong> - Scalable designs</li>
+              </ul>
             </div>
-            <p className="text-sm text-gray-600">
-              Import animated images and convert them to editable motion graphics with text and style controls.
-            </p>
-          </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-100 to-orange-200 rounded-xl flex items-center justify-center mr-4">
-                <File className="w-6 h-6 text-orange-600" />
+            {/* Project Files */}
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-6 rounded-xl border border-purple-100">
+              <div className="flex items-center mb-3">
+                <File className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-gray-900">Project Files</h4>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Animation Data</h3>
-                <p className="text-sm text-gray-600">Lottie JSON, AE</p>
-              </div>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li>• <strong>After Effects</strong> - .aep project files</li>
+                <li>• <strong>Premiere Pro</strong> - .prproj timeline files</li>
+                <li>• <strong>Blender</strong> - .blend 3D animations</li>
+                <li>• <strong>Cinema 4D</strong> - .c4d motion graphics</li>
+              </ul>
             </div>
-            <p className="text-sm text-gray-600">
-              Upload Lottie animations or After Effects projects for full editing capabilities with natural language commands.
-            </p>
           </div>
         </div>
 
