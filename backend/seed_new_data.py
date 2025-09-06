@@ -615,12 +615,16 @@ async def seed_database():
             format=ExportFormat.MP4,
             resolution=ExportResolution.FULL_HD,
             aspect_ratio=AspectRatio.WIDESCREEN,
+            custom_width=None,
+            custom_height=None,
             fps=30,
             transparent_background=False,
             status=ExportStatus.DONE,
             progress=100,
             download_url="/downloads/export_001.mp4",
             file_size=4500000,
+            error_message=None,
+            estimated_duration=None,
             actual_duration=45,
             completed_at=datetime.utcnow()
         ),
@@ -631,12 +635,16 @@ async def seed_database():
             format=ExportFormat.WEBM_ALPHA,
             resolution=ExportResolution.FOUR_K,
             aspect_ratio=AspectRatio.WIDESCREEN,
+            custom_width=None,
+            custom_height=None,
             fps=30,
             transparent_background=True,
             status=ExportStatus.DONE,
             progress=100,
             download_url="/downloads/export_002.webm",
             file_size=12800000,
+            error_message=None,
+            estimated_duration=None,
             actual_duration=120,
             completed_at=datetime.utcnow()
         ),
@@ -647,11 +655,18 @@ async def seed_database():
             format=ExportFormat.GIF,
             resolution=ExportResolution.HD,
             aspect_ratio=AspectRatio.SQUARE,
+            custom_width=None,
+            custom_height=None,
             fps=24,
             transparent_background=False,
             status=ExportStatus.RENDERING,
             progress=65,
-            estimated_duration=30
+            download_url=None,
+            file_size=None,
+            error_message=None,
+            estimated_duration=30,
+            actual_duration=None,
+            completed_at=None
         ),
         Export(
             id="export_004",
@@ -666,7 +681,12 @@ async def seed_database():
             transparent_background=True,
             status=ExportStatus.FAILED,
             progress=0,
-            error_message="Invalid Lottie animation structure"
+            download_url=None,
+            file_size=None,
+            error_message="Invalid Lottie animation structure",
+            estimated_duration=None,
+            actual_duration=None,
+            completed_at=None
         )
     ]
     
