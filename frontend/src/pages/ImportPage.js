@@ -92,7 +92,7 @@ const ImportPage = () => {
         items: wizardData.map(item => ({
           filename: item.name,
           title: item.templateTitle || item.name.replace(/\.[^/.]+$/, ""),
-          category: item.category || "MISCELLANEOUS",
+          category: item.category || "Miscellaneous",
           tags: item.tags ? item.tags.split(',').map(tag => tag.trim()) : [],
           thumbnail_url: item.thumbnail_url || "",
           creator_id: "current_user",
@@ -104,10 +104,14 @@ const ImportPage = () => {
         }))
       };
       
+      console.log('Creating templates with data:', createData);
+      
       const response = await apiService.bulkImportCreateTemplates(createData);
       
-      if (response.templates_created.length > 0) {
-        alert(`Successfully created ${response.templates_created.length} templates!`);
+      console.log('Template creation response:', response);
+      
+      if (response.templates_created && response.templates_created.length > 0) {
+        alert(`🎉 Successfully created ${response.templates_created.length} templates!`);
         setShowWizard(false);
         setWizardData([]);
         
@@ -121,13 +125,14 @@ const ImportPage = () => {
         }));
       }
       
-      if (response.errors.length > 0) {
+      if (response.errors && response.errors.length > 0) {
         console.error('Template creation errors:', response.errors);
+        alert(`⚠️ Some templates failed to create:\n${response.errors.map(e => `${e.filename}: ${e.error}`).join('\n')}`);
       }
       
     } catch (error) {
       console.error('Template creation failed:', error);
-      alert('Failed to create templates. Please try again.');
+      alert(`❌ Failed to create templates: ${error.message || 'Unknown error'}`);
     }
   };
 
