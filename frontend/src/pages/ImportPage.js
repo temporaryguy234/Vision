@@ -326,7 +326,7 @@ const ImportPage = () => {
                               Category
                             </label>
                             <select
-                              value={item.category || "MISCELLANEOUS"}
+                              value={item.category || "Miscellaneous"}
                               onChange={(e) => {
                                 const newData = [...wizardData];
                                 newData[index] = { ...newData[index], category: e.target.value };
@@ -334,15 +334,15 @@ const ImportPage = () => {
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
                             >
-                              <option value="INTROS_OUTROS">Intros & Outros</option>
-                              <option value="LOWER_THIRDS">Lower Thirds</option>
-                              <option value="TITLES_QUOTES">Titles & Quotes</option>
-                              <option value="CHARTS_MAPS">Charts & Maps</option>
-                              <option value="SOCIAL_MEDIA">Social Media Posts</option>
-                              <option value="ADS_PROMOS">Ads & Promos</option>
-                              <option value="OVERLAYS">Overlays</option>
-                              <option value="ANIMATED_ICONS">Animated Icons</option>
-                              <option value="MISCELLANEOUS">Miscellaneous</option>
+                              <option value="Intros & Outros">Intros & Outros</option>
+                              <option value="Lower Thirds">Lower Thirds</option>
+                              <option value="Titles & Quotes">Titles & Quotes</option>
+                              <option value="Charts & Maps">Charts & Maps</option>
+                              <option value="Social Media Posts">Social Media Posts</option>
+                              <option value="Ads & Promos">Ads & Promos</option>
+                              <option value="Overlays">Overlays</option>
+                              <option value="Animated Icons">Animated Icons</option>
+                              <option value="Miscellaneous">Miscellaneous</option>
                             </select>
                           </div>
                         </div>
