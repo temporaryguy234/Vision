@@ -1,59 +1,65 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form, Query, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import errors as mongo_errors
+from contextlib import asynccontextmanager
 import os
+import json
+import asyncio
+from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import json
-import re
-import uuid
+import aiofiles
+import hashlib
 
-# Import our models and file storage
+# Import our models and processors
 from models import *
-from file_storage import file_storage
-from lottiefiles import lottiefiles_service
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ.get('MONGO_URL')
-db_name = os.environ.get('DB_NAME', 'motionedit')
-client = AsyncIOMotorClient(mongo_url)
-db = client[db_name]
-
-# Create the main app
-app = FastAPI(
-    title="MotionEdit API",
-    version="2.0.0",
-    description="Comprehensive Motion Graphics Template Platform API"
-)
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=['*'],  # Allow all origins for development
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Mount static files for uploads
-uploads_dir = Path("/app/uploads")
-uploads_dir.mkdir(exist_ok=True, parents=True)
-app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+from lottie_processor import lottie_processor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Database connection
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+DB_NAME = "motionedit"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    app.mongodb_client = AsyncIOMotorClient(MONGO_URL)
+    app.mongodb = app.mongodb_client[DB_NAME]
+    logger.info("Connected to MongoDB")
+    yield
+    # Shutdown
+    app.mongodb_client.close()
+
+app = FastAPI(title="MotionEdit API", lifespan=lifespan)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create uploads directory
+UPLOADS_DIR = Path("/app/uploads")
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+# Mount static files
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+# API Router
+api_router = APIRouter(prefix="/api")
+
+# Database dependency
+def get_database():
+    return app.mongodb
 
 # Helper functions
 def create_slug(title: str) -> str:
