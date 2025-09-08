@@ -168,7 +168,7 @@ async def import_from_url(
         
         # Create template record
         template_data = {
-            "name": filename.replace('.json', '').replace('.lottie', ''),
+            "title": filename.replace('.json', '').replace('.lottie', ''),
             "description": f"Imported from URL: {url}",
             "tags": [],
             "source": "url",
@@ -179,7 +179,6 @@ async def import_from_url(
             "manifest": manifest,
             "category": TemplateCategory.MISCELLANEOUS,
             # Add required fields for Template model compatibility
-            "title": filename.replace('.json', '').replace('.lottie', ''),
             "slug": safe_slug,
             "preview_image_url": preview_url,
             "editable_parameters_schema": {
