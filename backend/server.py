@@ -161,6 +161,11 @@ async def import_from_url(
         # Generate preview
         preview_url = f"/uploads/previews/{unique_filename}.png"
         
+        # Generate proper slug
+        base_name = filename.replace('.json', '').replace('.lottie', '')
+        safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
+        safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
+        
         # Create template record
         template_data = {
             "name": filename.replace('.json', '').replace('.lottie', ''),
