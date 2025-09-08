@@ -175,7 +175,7 @@ async def import_from_url(
             "category": TemplateCategory.MISCELLANEOUS,
             # Add required fields for Template model compatibility
             "title": filename.replace('.json', '').replace('.lottie', ''),
-            "slug": unique_filename.replace('.json', '').replace('.lottie', ''),
+            "slug": safe_slug,
             "preview_image_url": preview_url,
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
