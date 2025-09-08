@@ -350,4 +350,14 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
                     "value": hex_match.group()
                 })
     
-    return patches
+# Include router
+app.include_router(api_router)
+
+# Health check
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
