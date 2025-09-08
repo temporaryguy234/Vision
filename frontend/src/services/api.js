@@ -1,21 +1,64 @@
 import axios from 'axios';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-const API_BASE = `${BACKEND_URL}/api`;
+const baseURL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
-// Create axios instance
 const api = axios.create({
-  baseURL: API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: `${baseURL}/api`,
+  timeout: 30000,
 });
 
-// API service functions
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
 export const apiService = {
-  // Templates
+  // Generic HTTP methods
+  async get(url, config = {}) {
+    const response = await api.get(url, config);
+    return response.data;
+  },
+
+  async post(url, data = {}, config = {}) {
+    const response = await api.post(url, data, config);
+    return response.data;
+  },
+
+  async put(url, data = {}, config = {}) {
+    const response = await api.put(url, data, config);
+    return response.data;
+  },
+
+  async delete(url, config = {}) {
+    const response = await api.delete(url, config);
+    return response.data;
+  },
+
+  // Template Upload and Management
+  async uploadTemplate(formData) {
+    const response = await api.post('/templates/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async importFromUrl(url) {
+    const formData = new FormData();
+    formData.append('url', url);
+    
+    const response = await api.post('/templates/import-url', formData);
+    return response.data;
+  },
+
   async getTemplates(params = {}) {
-    const response = await api.get('/templates', { params });
+    const queryString = new URLSearchParams(params).toString();
+    const response = await api.get(`/templates${queryString ? '?' + queryString : ''}`);
     return response.data;
   },
 
@@ -24,6 +67,29 @@ export const apiService = {
     return response.data;
   },
 
+  async getTemplateData(templateId) {
+    const response = await api.get(`/templates/${templateId}/data`);
+    return response.data;
+  },
+
+  // Template Revisions
+  async saveRevision(templateId, revisionData) {
+    const response = await api.post(`/templates/${templateId}/revisions`, revisionData);
+    return response.data;
+  },
+
+  async getRevisions(templateId, userId) {
+    const response = await api.get(`/templates/${templateId}/revisions?user_id=${userId}`);
+    return response.data;
+  },
+
+  // AI Prompt Processing
+  async processPrompt(templateId, promptData) {
+    const response = await api.post(`/templates/${templateId}/prompt`, promptData);
+    return response.data;
+  },
+
+  // Legacy endpoints for compatibility
   async createTemplate(templateData) {
     const response = await api.post('/templates', templateData);
     return response.data;
@@ -34,11 +100,20 @@ export const apiService = {
     return response.data;
   },
 
+  async deleteTemplate(templateId) {
+    const response = await api.delete(`/templates/${templateId}`);
+    return response.data;
+  },
+
   // Projects
-  async getProjects(userId, params = {}) {
-    const response = await api.get('/projects', { 
-      params: { user_id: userId, ...params } 
-    });
+  async createProject(projectData) {
+    const response = await api.post('/projects', projectData);
+    return response.data;
+  },
+
+  async getProjects(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await api.get(`/projects${queryString ? '?' + queryString : ''}`);
     return response.data;
   },
 
@@ -47,129 +122,33 @@ export const apiService = {
     return response.data;
   },
 
-  async createProject(projectData) {
-    const response = await api.post('/projects', projectData);
-    return response.data;
-  },
-
   async updateProject(projectId, projectData) {
     const response = await api.put(`/projects/${projectId}`, projectData);
     return response.data;
   },
 
-  async deleteProject(projectId) {
-    const response = await api.delete(`/projects/${projectId}`);
-    return response.data;
-  },
-
-  // Natural Language Commands
-  async parseCommand(commandData) {
-    const response = await api.post('/commands/parse', commandData);
-    return response.data;
-  },
-
   // Exports
-  async getExports(userId, params = {}) {
-    const response = await api.get('/exports', { 
-      params: { user_id: userId, ...params } 
-    });
-    return response.data;
-  },
-
   async createExport(exportData) {
     const response = await api.post('/exports', exportData);
     return response.data;
   },
 
-  // Brand Kits
-  async getBrandKits(userId, params = {}) {
-    const response = await api.get('/brand-kits', { 
-      params: { user_id: userId, ...params } 
-    });
+  async getExports(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await api.get(`/exports${queryString ? '?' + queryString : ''}`);
     return response.data;
   },
 
+  // Brand Kits
   async createBrandKit(brandKitData) {
     const response = await api.post('/brand-kits', brandKitData);
     return response.data;
   },
 
-  async deleteBrandKit(kitId) {
-    const response = await api.delete(`/brand-kits/${kitId}`);
+  async getBrandKits(userId) {
+    const response = await api.get(`/brand-kits?user_id=${userId}`);
     return response.data;
-  },
-
-  // Statistics
-  async getStats() {
-    const response = await api.get('/stats');
-    return response.data;
-  },
-
-  // File Upload
-  async uploadTemplate(formData) {
-    const response = await api.post('/upload/template', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  },
-
-  // Bulk Import
-  async bulkImportUpload(formData) {
-    const response = await api.post('/bulk-import/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  },
-
-  async bulkImportCreateTemplates(templateData) {
-    const response = await api.post('/bulk-import/create-templates', templateData);
-    return response.data;
-  },
-
-  // LottieFiles Integration
-  async searchLottieFilesAnimations(params = {}) {
-    const response = await api.get('/lottiefiles/search', { params });
-    return response.data;
-  },
-
-  async getLottieFilesAnimation(animationId) {
-    const response = await api.get(`/lottiefiles/animation/${animationId}`);
-    return response.data;
-  },
-
-  async getLottieFilesAnimationData(animationId) {
-    const response = await api.get(`/lottiefiles/animation/${animationId}/data`);
-    return response.data;
-  },
-
-  async getPopularLottieFilesAnimations(params = {}) {
-    const response = await api.get('/lottiefiles/popular', { params });
-    return response.data;
-  },
-
-  async getLottieFilesCategories() {
-    const response = await api.get('/lottiefiles/categories');
-    return response.data;
-  },
-
-  async importLottieFilesAnimation(animationId, targetCategory = null) {
-    const params = targetCategory ? { target_category: targetCategory } : {};
-    const response = await api.post(`/lottiefiles/import/${animationId}`, null, { params });
-    return response.data;
-  },
-};
-
-// Error interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API Error:', error.response?.data || error.message);
-    return Promise.reject(error);
   }
-);
+};
 
 export default api;
