@@ -353,3 +353,16 @@ class ExportCreate(BaseModel):
     custom_height: Optional[int] = Field(ge=100, le=4000)
     fps: int = Field(default=30, ge=1, le=120)
     transparent_background: bool = Field(default=False)
+
+# Revision System for Template Edits
+class TemplateRevision(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    template_id: str
+    user_id: str
+    state: Dict[str, Any] = Field(default={}, description="Current edit state")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class TemplateRevisionCreate(BaseModel):
+    template_id: str
+    user_id: str
+    state: Dict[str, Any] = Field(default={})
