@@ -175,91 +175,66 @@ async def import_from_url(
         logger.error(f"URL import error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Validation functions for editable parameters
-class ParametersValidator:
-    @staticmethod
-    def validate_editable_parameters(schema: EditableParametersSchema) -> Dict[str, str]:
-        """Validate editable parameters schema and return errors"""
-        errors = {}
+# Template CRUD Operations
+@api_router.get("/templates")
+async def get_templates(
+    category: Optional[str] = None,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    db=Depends(get_database)
+):
+    """Get templates with optional filtering"""
+    try:
+        filter_query = {}
+        if category:
+            filter_query["category"] = category
         
-        try:
-            # Validate canvas parameters
-            canvas = schema.canvas
-            if canvas.width < 100 or canvas.width > 4000:
-                errors['canvas.width'] = "Width must be between 100 and 4000 pixels"
-            if canvas.height < 100 or canvas.height > 4000:
-                errors['canvas.height'] = "Height must be between 100 and 4000 pixels"
-            if canvas.global_playback_speed < 0.5 or canvas.global_playback_speed > 2.0:
-                errors['canvas.global_playback_speed'] = "Playback speed must be between 0.5× and 2.0×"
-            
-            # Validate background color
-            if canvas.background_color != "transparent":
-                if not re.match(r'^#[0-9A-Fa-f]{6}$', canvas.background_color):
-                    errors['canvas.background_color'] = "Background color must be a valid hex color or 'transparent'"
-            
-            # Validate elements
-            element_ids = set()
-            for i, element in enumerate(schema.elements):
-                element_prefix = f"elements[{i}]"
-                
-                # Check for duplicate IDs
-                if element.id in element_ids:
-                    errors[f"{element_prefix}.id"] = f"Duplicate element ID: {element.id}"
-                element_ids.add(element.id)
-                
-                # Validate parameters based on element type
-                params = element.parameters
-                
-                if element.type == ElementType.TEXT:
-                    if len(params.content) > 500:
-                        errors[f"{element_prefix}.content"] = "Text content must not exceed 500 characters"
-                    if params.font_size < 12 or params.font_size > 180:
-                        errors[f"{element_prefix}.font_size"] = "Font size must be between 12 and 180 pixels"
-                
-                elif element.type == ElementType.CHART:
-                    if params.line_width < 0 or params.line_width > 20:
-                        errors[f"{element_prefix}.line_width"] = "Line width must be between 0 and 20 pixels"
-                    if params.bar_width < 1 or params.bar_width > 40:
-                        errors[f"{element_prefix}.bar_width"] = "Bar width must be between 1 and 40 pixels"
-                
-                elif element.type == ElementType.SHAPE:
-                    if params.stroke_width < 0 or params.stroke_width > 20:
-                        errors[f"{element_prefix}.stroke_width"] = "Stroke width must be between 0 and 20 pixels"
-                
-                elif element.type == ElementType.MAP:
-                    if params.border_width < 0 or params.border_width > 12:
-                        errors[f"{element_prefix}.border_width"] = "Border width must be between 0 and 12 pixels"
-                
-                elif element.type == ElementType.LOTTIE:
-                    if params.speed < 0.1 or params.speed > 5.0:
-                        errors[f"{element_prefix}.speed"] = "Animation speed must be between 0.1 and 5.0"
-                
-                # Validate common parameters (position, scale, rotation, opacity)
-                if hasattr(params, 'x') and (params.x < 0 or params.x > 100):
-                    errors[f"{element_prefix}.x"] = "X position must be between 0 and 100 percent"
-                if hasattr(params, 'y') and (params.y < 0 or params.y > 100):
-                    errors[f"{element_prefix}.y"] = "Y position must be between 0 and 100 percent"
-                if hasattr(params, 'scale') and (params.scale < 0.1 or params.scale > 5.0):
-                    errors[f"{element_prefix}.scale"] = "Scale must be between 0.1 and 5.0"
-                if hasattr(params, 'rotation') and (params.rotation < -360 or params.rotation > 360):
-                    errors[f"{element_prefix}.rotation"] = "Rotation must be between -360 and 360 degrees"
-                if hasattr(params, 'opacity') and (params.opacity < 0 or params.opacity > 1):
-                    errors[f"{element_prefix}.opacity"] = "Opacity must be between 0 and 1"
-                
-                # Validate entrance animation if present
-                if hasattr(params, 'entrance_animation') and params.entrance_animation:
-                    anim = params.entrance_animation
-                    if anim.delay < 0 or anim.delay > 5:
-                        errors[f"{element_prefix}.entrance_animation.delay"] = "Animation delay must be between 0 and 5 seconds"
-                    if anim.duration < 0.5 or anim.duration > 5:
-                        errors[f"{element_prefix}.entrance_animation.duration"] = "Animation duration must be between 0.5 and 5 seconds"
+        cursor = db.templates.find(filter_query).skip(skip).limit(limit)
+        templates = await cursor.to_list(length=None)
         
-        except Exception as e:
-            errors['schema'] = f"Invalid schema structure: {str(e)}"
+        return [Template(**template) for template in templates]
         
-        return errors
+    except Exception as e:
+        logger.error(f"Get templates error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-validator = ParametersValidator()
+@api_router.get("/templates/{template_id}")
+async def get_template(template_id: str, db=Depends(get_database)):
+    """Get a specific template by ID"""
+    try:
+        template = await db.templates.find_one({"id": template_id})
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        return Template(**template)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get template error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/templates/{template_id}/data")
+async def get_template_animation_data(template_id: str, db=Depends(get_database)):
+    """Get the original animation data for a template"""
+    try:
+        template = await db.templates.find_one({"id": template_id})
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        # Read the animation file
+        file_path = Path("/app" + template["file_url"])
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Animation file not found")
+        
+        animation_data, _ = await lottie_processor.process_file(file_path)
+        return animation_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get animation data error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # API Routes
 
