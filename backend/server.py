@@ -61,31 +61,119 @@ api_router = APIRouter(prefix="/api")
 def get_database():
     return app.mongodb
 
-# Helper functions
-def create_slug(title: str) -> str:
-    """Create a URL-friendly slug from title"""
-    # Replace underscores and dots with hyphens, remove other special chars
-    slug = re.sub(r'[._]', '-', title.lower())
-    slug = re.sub(r'[^\w\s-]', '', slug)
-    slug = re.sub(r'[-\s]+', '-', slug)
-    return slug.strip('-')
+# Template Upload and Processing
+@api_router.post("/templates/upload")
+async def upload_template(
+    file: UploadFile = File(...),
+    source: str = Form("upload"),
+    db=Depends(get_database)
+):
+    """Upload and process a Lottie template file"""
+    try:
+        # Validate file type
+        if not (file.filename.endswith('.json') or file.filename.endswith('.lottie')):
+            raise HTTPException(status_code=400, detail="Only .json and .lottie files are supported")
+        
+        # Generate unique filename
+        file_hash = hashlib.md5(file.filename.encode()).hexdigest()[:8]
+        safe_name = "".join(c for c in file.filename if c.isalnum() or c in '.-_')
+        unique_filename = f"{file_hash}_{safe_name}"
+        file_path = UPLOADS_DIR / unique_filename
+        
+        # Save file
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        # Process file
+        animation_data, manifest = await lottie_processor.process_file(file_path)
+        
+        # Generate preview (placeholder for now)
+        preview_url = f"/uploads/previews/{unique_filename}.png"
+        
+        # Create template record
+        template_data = {
+            "name": file.filename.replace('.json', '').replace('.lottie', ''),
+            "description": f"Imported from {source}",
+            "tags": [],
+            "source": source,
+            "license": "",
+            "author": "",
+            "file_url": f"/uploads/{unique_filename}",
+            "preview_url": preview_url,
+            "manifest": manifest,
+            "category": TemplateCategory.MISCELLANEOUS
+        }
+        
+        template = Template(**template_data)
+        result = await db.templates.insert_one(template.model_dump())
+        
+        return {
+            "id": template.id,
+            "name": template.name,
+            "preview_url": template.preview_url,
+            "manifest": template.manifest,
+            "file_url": template.file_url
+        }
+        
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-async def ensure_unique_slug(slug: str, template_id: Optional[str] = None) -> str:
-    """Ensure slug is unique by appending numbers if necessary"""
-    original_slug = slug
-    counter = 1
-    
-    while True:
-        query = {"slug": slug}
-        if template_id:
-            query["id"] = {"$ne": template_id}
-            
-        existing = await db.templates.find_one(query)
-        if not existing:
-            return slug
-            
-        slug = f"{original_slug}-{counter}"
-        counter += 1
+@api_router.post("/templates/import-url")
+async def import_from_url(
+    url: str = Form(...),
+    db=Depends(get_database)
+):
+    """Import a Lottie template from URL"""
+    try:
+        # Process URL
+        animation_data, manifest = await lottie_processor.process_url(url)
+        
+        # Generate filename from URL
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        filename = Path(parsed_url.path).name or "imported_animation.json"
+        
+        # Save locally
+        file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+        unique_filename = f"{file_hash}_{filename}"
+        file_path = UPLOADS_DIR / unique_filename
+        
+        async with aiofiles.open(file_path, 'w') as f:
+            await f.write(json.dumps(animation_data, indent=2))
+        
+        # Generate preview
+        preview_url = f"/uploads/previews/{unique_filename}.png"
+        
+        # Create template record
+        template_data = {
+            "name": filename.replace('.json', '').replace('.lottie', ''),
+            "description": f"Imported from URL: {url}",
+            "tags": [],
+            "source": "url",
+            "license": "",
+            "author": "",
+            "file_url": f"/uploads/{unique_filename}",
+            "preview_url": preview_url,
+            "manifest": manifest,
+            "category": TemplateCategory.MISCELLANEOUS
+        }
+        
+        template = Template(**template_data)
+        result = await db.templates.insert_one(template.model_dump())
+        
+        return {
+            "id": template.id,
+            "name": template.name,
+            "preview_url": template.preview_url,
+            "manifest": template.manifest,
+            "file_url": template.file_url
+        }
+        
+    except Exception as e:
+        logger.error(f"URL import error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Validation functions for editable parameters
 class ParametersValidator:
