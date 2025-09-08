@@ -124,7 +124,7 @@ async def upload_template(
         
         return {
             "id": template.id,
-            "name": template.name,
+            "name": template.title,
             "preview_url": template.preview_url,
             "manifest": template.manifest,
             "file_url": template.file_url
