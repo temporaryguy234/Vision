@@ -91,9 +91,14 @@ async def upload_template(
         # Generate preview (placeholder for now)
         preview_url = f"/uploads/previews/{unique_filename}.png"
         
+        # Generate proper slug
+        base_name = file.filename.replace('.json', '').replace('.lottie', '')
+        safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
+        safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
+        
         # Create template record
         template_data = {
-            "name": file.filename.replace('.json', '').replace('.lottie', ''),
+            "name": base_name,
             "description": f"Imported from {source}",
             "tags": [],
             "source": source,
@@ -104,8 +109,8 @@ async def upload_template(
             "manifest": manifest,
             "category": TemplateCategory.MISCELLANEOUS,
             # Add required fields for Template model compatibility
-            "title": file.filename.replace('.json', '').replace('.lottie', ''),
-            "slug": unique_filename.replace('.json', '').replace('.lottie', ''),
+            "title": base_name,
+            "slug": safe_slug,
             "preview_image_url": preview_url,
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
