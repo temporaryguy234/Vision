@@ -102,7 +102,17 @@ async def upload_template(
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
-            "category": TemplateCategory.MISCELLANEOUS
+            "category": TemplateCategory.MISCELLANEOUS,
+            # Add required fields for Template model compatibility
+            "title": file.filename.replace('.json', '').replace('.lottie', ''),
+            "slug": unique_filename.replace('.json', '').replace('.lottie', ''),
+            "preview_image_url": preview_url,
+            "editable_parameters_schema": {
+                "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
+                "elements": []
+            },
+            "creator_id": "system",
+            "is_public": True
         }
         
         template = Template(**template_data)
