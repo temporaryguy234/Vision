@@ -206,6 +206,14 @@ class Template(BaseModel):
     is_public: bool = Field(default=True)
     download_count: int = Field(default=0, ge=0)
     rating: float = Field(default=0.0, ge=0.0, le=5.0)
+    # New fields from the fixed system
+    description: Optional[str] = Field(default="", max_length=1000)
+    source: Optional[str] = Field(default="", description="Original source (upload/url)")
+    license: Optional[str] = Field(default="")
+    author: Optional[str] = Field(default="")
+    file_url: Optional[str] = Field(default="", description="Path to the .json or .lottie file")
+    preview_url: Optional[str] = Field(default="", description="Generated preview thumbnail")
+    manifest: Dict[str, Any] = Field(default={}, description="Auto-generated editable elements manifest")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
