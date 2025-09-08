@@ -194,7 +194,7 @@ async def import_from_url(
         
         return {
             "id": template.id,
-            "name": template.name,
+            "name": template.title,
             "preview_url": template.preview_url,
             "manifest": template.manifest,
             "file_url": template.file_url
