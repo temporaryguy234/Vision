@@ -98,7 +98,7 @@ async def upload_template(
         
         # Create template record
         template_data = {
-            "name": base_name,
+            "title": base_name,
             "description": f"Imported from {source}",
             "tags": [],
             "source": source,
@@ -109,7 +109,6 @@ async def upload_template(
             "manifest": manifest,
             "category": TemplateCategory.MISCELLANEOUS,
             # Add required fields for Template model compatibility
-            "title": base_name,
             "slug": safe_slug,
             "preview_image_url": preview_url,
             "editable_parameters_schema": {
