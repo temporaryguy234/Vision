@@ -18,6 +18,7 @@ class TemplateCategory(str, Enum):
 
 class AssetType(str, Enum):
     LOTTIE_JSON = "Lottie JSON"
+    LOTTIE_FILE = "Lottie File"
     MP4 = "MP4"
     WEBM_ALPHA = "WebM with Alpha"
     GIF = "GIF"
