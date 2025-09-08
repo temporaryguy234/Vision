@@ -302,6 +302,14 @@ class TemplateCreate(BaseModel):
     creator_id: str
     version: str = Field(default="1.0.0")
     is_public: bool = Field(default=True)
+    # New fields from the fixed system
+    description: Optional[str] = Field(default="", max_length=1000)
+    source: Optional[str] = Field(default="")
+    license: Optional[str] = Field(default="")
+    author: Optional[str] = Field(default="")
+    file_url: Optional[str] = Field(default="")
+    preview_url: Optional[str] = Field(default="")
+    manifest: Dict[str, Any] = Field(default={})
 
 class TemplateUpdate(BaseModel):
     title: Optional[str] = Field(min_length=1, max_length=200)
