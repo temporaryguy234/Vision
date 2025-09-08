@@ -39,9 +39,10 @@ class ProjectStatus(str, Enum):
 
 class ExportFormat(str, Enum):
     MP4 = "MP4"
+    WEBM = "WebM"
     GIF = "GIF"
-    WEBM_ALPHA = "WebM with Alpha"
-    LOTTIE_JSON = "Lottie JSON"
+    PNG = "PNG"
+    JSON = "JSON"
 
 class ExportResolution(str, Enum):
     FOUR_K = "4K"
