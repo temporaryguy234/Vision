@@ -145,14 +145,6 @@ const EditorPage = () => {
     setCurrentState(prev => ({ ...prev, speed: newSpeed }));
   };
 
-  const handlePlay = () => {
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleReset = () => {
-    console.log('Reset clicked');
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
