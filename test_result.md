@@ -339,7 +339,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Improved Bulk Import System Testing"
+    - "Lottie File Import and Template Functionality Review"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
