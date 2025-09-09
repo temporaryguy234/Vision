@@ -14,9 +14,19 @@ const DotLottiePlayer = React.lazy(() =>
         }
       }, []);
 
+      // Use React.createElement to create the web component
       return React.createElement('dotlottie-player', {
         ...props,
-        ref
+        ref,
+        autoplay: false,
+        loop: true,
+        controls: false,
+        mode: 'normal',
+        style: {
+          width: '100%',
+          height: '100%',
+          ...props.style
+        }
       });
     })
   }))
