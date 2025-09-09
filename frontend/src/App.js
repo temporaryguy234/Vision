@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -12,6 +12,8 @@ import {
   Globe,
   Settings
 } from 'lucide-react';
+
+import { apiService } from './services/api';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
