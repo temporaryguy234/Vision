@@ -312,7 +312,7 @@ const EditorPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <h1 className="text-xl font-semibold text-gray-900">
-                  {template?.name || 'Template Editor'}
+                  {template?.title || 'Template Editor'}
                 </h1>
                 
                 <div className="flex items-center space-x-2">
