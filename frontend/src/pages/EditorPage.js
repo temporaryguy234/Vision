@@ -342,7 +342,7 @@ const EditorPage = () => {
                 </div>
                 
                 <div className="space-y-3">
-                  {template.manifest.colors.map((colorElement) => (
+                  {template.manifest.colors.slice(0, 5).map((colorElement) => (
                     <div key={colorElement.id}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         {colorElement.label}
@@ -363,6 +363,11 @@ const EditorPage = () => {
                       </div>
                     </div>
                   ))}
+                  {template.manifest.colors.length > 5 && (
+                    <div className="text-sm text-gray-500 text-center py-2">
+                      ... and {template.manifest.colors.length - 5} more colors
+                    </div>
+                  )}
                 </div>
               </div>
             )}
