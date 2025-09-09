@@ -199,14 +199,14 @@ const EditorPage = () => {
                 
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={handlePlay}
+                    onClick={() => setIsPlaying(!isPlaying)}
                     className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                   >
                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                   </button>
                   
                   <button
-                    onClick={handleReset}
+                    onClick={() => console.log('Reset clicked')}
                     className="p-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                   >
                     <RotateCcw className="w-5 h-5" />
