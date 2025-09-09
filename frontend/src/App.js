@@ -136,73 +136,208 @@ const Layout = ({ children }) => {
   );
 };
 
-// Home/Explore Page (simplified)
+// Home/Explore Page (restored original clean design)
 const HomePage = () => {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Hero Section */}
-        <div className="text-center py-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Create Amazing Motion Graphics
+        {/* Clean Hero Section - Original Style */}
+        <div className="text-center py-16 bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl mb-12">
+          <h1 className="text-5xl font-bold text-gray-900 mb-6">
+            Create & Edit Motion Graphics
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Upload your Lottie animations and After Effects exports, then edit them with our powerful visual editor and AI-powered prompts.
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Import Lottie animations, edit with visual controls and AI prompts. Professional motion graphics made simple.
           </p>
           
           <div className="flex items-center justify-center space-x-4">
             <Link
               to="/upload"
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
+              className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
             >
               Upload Templates
             </Link>
             <Link
               to="/library"
-              className="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+              className="px-8 py-4 border-2 border-orange-500 text-orange-500 font-semibold rounded-xl hover:bg-orange-50 transition-colors"
             >
               Browse Library
             </Link>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <Upload className="w-6 h-6 text-orange-600" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Upload & Edit</h3>
-                <p className="text-gray-600">Import .json and .lottie files</p>
-              </div>
+        {/* Features Grid - Clean Design */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Upload className="w-8 h-8 text-white" />
             </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">Import & Upload</h3>
+            <p className="text-gray-600">Drag & drop .json and .lottie files or import from URLs. Full support for After Effects exports.</p>
           </div>
           
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Edit className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Visual Editor</h3>
-                <p className="text-gray-600">Edit text, colors, and images</p>
-              </div>
+          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Edit className="w-8 h-8 text-white" />
             </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">Visual Editor</h3>
+            <p className="text-gray-600">Edit text, colors, images and speed with live preview. Click elements to edit instantly.</p>
           </div>
           
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Download className="w-6 h-6 text-green-600" />
+          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Settings className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Prompts</h3>
+            <p className="text-gray-600">Use natural language: "make it faster", "change logo", "set color to blue". No technical skills needed.</p>
+          </div>
+        </div>
+
+        {/* Recent Templates - Show Real Lottie Templates */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Templates</h2>
+              <p className="text-gray-600">Professional Lottie animations ready to customize</p>
+            </div>
+            <Link
+              to="/library"
+              className="text-orange-500 hover:text-orange-600 font-medium flex items-center"
+            >
+              View All
+              <span className="ml-1">→</span>
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Lottie Template Cards */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gradient-to-br from-orange-100 to-red-100 relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24">
+                    {/* This will show actual Lottie animation */}
+                    <div className="w-full h-full bg-orange-200 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">🏷️</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
+                  <Link
+                    to="/t/demo-price-tag"
+                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
+                  >
+                    Edit Template
+                  </Link>
+                </div>
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">AI Prompts</h3>
-                <p className="text-gray-600">Use natural language commands</p>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-1">Price Tag</h3>
+                <p className="text-sm text-gray-600 mb-2">Editable discount badge</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-orange-500 bg-orange-50 px-2 py-1 rounded">Lottie</span>
+                  <span className="text-xs text-gray-500">2.1s</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gradient-to-br from-green-100 to-teal-100 relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24">
+                    <div className="w-full h-full bg-green-200 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">📈</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
+                  <Link
+                    to="/t/demo-chart"
+                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
+                  >
+                    Edit Template
+                  </Link>
+                </div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-1">Stock Chart</h3>
+                <p className="text-sm text-gray-600 mb-2">Animated data visualization</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-500 bg-green-50 px-2 py-1 rounded">Lottie</span>
+                  <span className="text-xs text-gray-500">4.0s</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gradient-to-br from-blue-100 to-purple-100 relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24">
+                    <div className="w-full h-full bg-blue-200 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">✨</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
+                  <Link
+                    to="/t/demo-loader"
+                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
+                  >
+                    Edit Template
+                  </Link>
+                </div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-1">Loading Animation</h3>
+                <p className="text-sm text-gray-600 mb-2">Smooth loading indicator</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">Lottie</span>
+                  <span className="text-xs text-gray-500">2.5s</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24">
+                    <div className="w-full h-full bg-purple-200 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">❤️</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
+                  <Link
+                    to="/t/demo-like"
+                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
+                  >
+                    Edit Template
+                  </Link>
+                </div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-1">Like Animation</h3>
+                <p className="text-sm text-gray-600 mb-2">Social media interaction</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-purple-500 bg-purple-50 px-2 py-1 rounded">Lottie</span>
+                  <span className="text-xs text-gray-500">1.8s</span>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Call to Action */}
+        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create?</h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            Upload your Lottie files or start with our templates. Edit with AI prompts and export professional videos.
+          </p>
+          <Link
+            to="/upload"
+            className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
+          >
+            Get Started
+          </Link>
         </div>
       </div>
     </div>
