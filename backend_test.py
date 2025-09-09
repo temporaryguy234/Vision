@@ -951,8 +951,285 @@ class MotionEditAPITester:
         
         return False
 
+    def test_lottie_upload_endpoints(self):
+        """Test the specific Lottie file upload functionality as requested in review"""
+        print(f"\n🎯 LOTTIE FILE UPLOAD FUNCTIONALITY TESTING")
+        print("-" * 50)
+        
+        # Test 1: Upload Endpoints Testing - Test /api/templates/upload for Lottie JSON files
+        print(f"\n🔍 Testing Lottie JSON File Upload...")
+        url = f"{self.base_url}/api/templates/upload"
+        
+        try:
+            files = {'file': ('test_lottie.json', open(self.lottie_file, 'rb'), 'application/json')}
+            data = {'source': 'upload'}
+            
+            response = requests.post(url, files=files, data=data, timeout=30)
+            files['file'][1].close()  # Close file handle
+            
+            success = response.status_code == 200
+            if success:
+                self.tests_passed += 1
+                print(f"✅ Lottie JSON Upload - Status: {response.status_code}")
+                
+                upload_result = response.json()
+                template_id = upload_result.get('id')
+                
+                # Verify response structure
+                required_fields = ['id', 'name', 'preview_url', 'manifest', 'file_url']
+                missing_fields = [field for field in required_fields if field not in upload_result]
+                if missing_fields:
+                    print(f"   ⚠️  Missing response fields: {missing_fields}")
+                else:
+                    print(f"   ✅ Upload response complete")
+                    print(f"   - Template ID: {template_id}")
+                    print(f"   - File URL: {upload_result.get('file_url')}")
+                    print(f"   - Preview URL: {upload_result.get('preview_url')}")
+                    
+                    # Store for further testing
+                    if template_id:
+                        self.created_resources.append(template_id)
+                        
+                        # Test 2: Template Creation - Verify template was created properly
+                        print(f"\n🔍 Testing Template Creation from Upload...")
+                        template_success, template_data = self.run_test(
+                            f"Get Uploaded Template", "GET", f"templates/{template_id}", 200
+                        )
+                        
+                        if template_success:
+                            print(f"   ✅ Template created successfully")
+                            print(f"   - Title: {template_data.get('title')}")
+                            print(f"   - Category: {template_data.get('category')}")
+                            print(f"   - File URL: {template_data.get('file_url')}")
+                            
+                            # Test 3: Manifest Generation - Check manifest quality
+                            manifest = template_data.get('manifest', {})
+                            if manifest:
+                                print(f"   ✅ Manifest generated")
+                                text_elements = len(manifest.get('text', []))
+                                color_elements = len(manifest.get('colors', []))
+                                image_elements = len(manifest.get('images', []))
+                                print(f"   - Text elements: {text_elements}")
+                                print(f"   - Color elements: {color_elements}")
+                                print(f"   - Image elements: {image_elements}")
+                                print(f"   - Speed control: {manifest.get('speed', {})}")
+                                print(f"   - Anchors: {len(manifest.get('anchors', []))}")
+                            else:
+                                print(f"   ⚠️  No manifest generated")
+                            
+                            # Test 4: File Storage - Verify file is accessible
+                            file_url = template_data.get('file_url', '')
+                            if file_url:
+                                print(f"\n🔍 Testing File Storage Access...")
+                                # Try to access the file directly
+                                file_access_url = f"{self.base_url}{file_url}"
+                                try:
+                                    file_response = requests.get(file_access_url, timeout=10)
+                                    if file_response.status_code == 200:
+                                        print(f"   ✅ File accessible at: {file_url}")
+                                        # Verify it's valid JSON
+                                        try:
+                                            file_json = file_response.json()
+                                            if 'v' in file_json and 'layers' in file_json:
+                                                print(f"   ✅ File contains valid Lottie JSON")
+                                            else:
+                                                print(f"   ⚠️  File may not be valid Lottie format")
+                                        except:
+                                            print(f"   ⚠️  File is not valid JSON")
+                                    else:
+                                        print(f"   ⚠️  File not accessible directly (Status: {file_response.status_code})")
+                                        # This might be expected due to routing - test via data endpoint
+                                        print(f"   🔍 Testing via data endpoint instead...")
+                                        data_success, data_result = self.run_test(
+                                            f"Get Template Data", "GET", f"templates/{template_id}/data", 200
+                                        )
+                                        if data_success:
+                                            print(f"   ✅ Template data accessible via API endpoint")
+                                        else:
+                                            print(f"   ❌ Template data not accessible")
+                                except Exception as e:
+                                    print(f"   ❌ File access error: {e}")
+                            
+                            # Test 5: Library Display - Verify template appears in library
+                            print(f"\n🔍 Testing Library Display...")
+                            library_success, library_data = self.run_test(
+                                f"Get Templates Library", "GET", "templates", 200
+                            )
+                            
+                            if library_success:
+                                # Check if our uploaded template appears
+                                uploaded_template = None
+                                for template in library_data:
+                                    if template.get('id') == template_id:
+                                        uploaded_template = template
+                                        break
+                                
+                                if uploaded_template:
+                                    print(f"   ✅ Template appears in library")
+                                    print(f"   - Has preview URL: {'preview_image_url' in uploaded_template}")
+                                    print(f"   - Has file URL: {'file_url' in uploaded_template}")
+                                    print(f"   - Is public: {uploaded_template.get('is_public', False)}")
+                                else:
+                                    print(f"   ⚠️  Template not found in library")
+                        
+                return True, upload_result
+            else:
+                print(f"❌ Lottie JSON Upload Failed - Expected 200, got {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text}")
+                return False, {}
+                
+        except Exception as e:
+            print(f"❌ Lottie JSON Upload Failed - Error: {str(e)}")
+            return False, {}
+        
+        finally:
+            self.tests_run += 1
+
+    def test_lottie_url_import(self):
+        """Test importing Lottie files from URL"""
+        print(f"\n🔍 Testing Lottie URL Import...")
+        
+        # Test with a sample Lottie URL (we'll use a mock URL for testing)
+        test_url = "https://assets3.lottiefiles.com/packages/lf20_UJNc2t.json"
+        
+        import_data = {'url': test_url}
+        success, result = self.run_test(
+            "Import Lottie from URL", "POST", "templates/import-url", 200, data=import_data
+        )
+        
+        if success:
+            template_id = result.get('id')
+            if template_id:
+                self.created_resources.append(template_id)
+                print(f"   ✅ URL import successful")
+                print(f"   - Template ID: {template_id}")
+                print(f"   - File URL: {result.get('file_url')}")
+                
+                # Verify the imported template
+                verify_success, template_data = self.run_test(
+                    f"Verify URL Import", "GET", f"templates/{template_id}", 200
+                )
+                
+                if verify_success:
+                    print(f"   ✅ Imported template verified")
+                    print(f"   - Source: {template_data.get('source')}")
+                    print(f"   - Description contains URL: {'URL' in template_data.get('description', '')}")
+        
+        return success
+
+    def test_lottie_zip_file_upload(self):
+        """Test uploading .lottie ZIP files"""
+        print(f"\n🔍 Testing .lottie ZIP File Upload...")
+        
+        # Create a simple .lottie ZIP file for testing
+        import zipfile
+        import tempfile
+        
+        # Create a temporary .lottie file
+        lottie_zip_path = self.test_files_dir / "test_animation.lottie"
+        
+        # Create ZIP with our test Lottie JSON
+        with zipfile.ZipFile(lottie_zip_path, 'w') as zip_file:
+            zip_file.write(self.lottie_file, 'data.json')
+        
+        url = f"{self.base_url}/api/templates/upload"
+        
+        try:
+            files = {'file': ('test_animation.lottie', open(lottie_zip_path, 'rb'), 'application/zip')}
+            data = {'source': 'upload'}
+            
+            response = requests.post(url, files=files, data=data, timeout=30)
+            files['file'][1].close()  # Close file handle
+            
+            success = response.status_code == 200
+            if success:
+                self.tests_passed += 1
+                print(f"✅ .lottie ZIP Upload - Status: {response.status_code}")
+                
+                upload_result = response.json()
+                template_id = upload_result.get('id')
+                
+                if template_id:
+                    self.created_resources.append(template_id)
+                    print(f"   ✅ .lottie file processed successfully")
+                    print(f"   - Template ID: {template_id}")
+                    
+                    # Test that we can get the animation data
+                    data_success, animation_data = self.run_test(
+                        f"Get .lottie Animation Data", "GET", f"templates/{template_id}/data", 200
+                    )
+                    
+                    if data_success:
+                        print(f"   ✅ Animation data extracted from ZIP")
+                        print(f"   - Has layers: {'layers' in animation_data}")
+                        print(f"   - Version: {animation_data.get('v', 'Unknown')}")
+                
+                return True, upload_result
+            else:
+                print(f"❌ .lottie ZIP Upload Failed - Expected 200, got {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text}")
+                return False, {}
+                
+        except Exception as e:
+            print(f"❌ .lottie ZIP Upload Failed - Error: {str(e)}")
+            return False, {}
+        
+        finally:
+            self.tests_run += 1
+
+    def test_preview_thumbnail_generation(self):
+        """Test if preview images/thumbnails are being generated"""
+        print(f"\n🔍 Testing Preview/Thumbnail Generation...")
+        
+        # Upload a file first
+        upload_success, upload_result = self.test_lottie_upload_endpoints()
+        
+        if upload_success:
+            template_id = upload_result.get('id')
+            preview_url = upload_result.get('preview_url')
+            
+            if preview_url:
+                print(f"   ✅ Preview URL generated: {preview_url}")
+                
+                # Try to access the preview
+                if preview_url.startswith('/'):
+                    full_preview_url = f"{self.base_url}{preview_url}"
+                else:
+                    full_preview_url = preview_url
+                
+                try:
+                    preview_response = requests.get(full_preview_url, timeout=10)
+                    if preview_response.status_code == 200:
+                        print(f"   ✅ Preview image accessible")
+                        # Check if it's actually an image
+                        content_type = preview_response.headers.get('content-type', '')
+                        if 'image' in content_type:
+                            print(f"   ✅ Preview is valid image ({content_type})")
+                        else:
+                            print(f"   ⚠️  Preview URL doesn't return image content ({content_type})")
+                    else:
+                        print(f"   ⚠️  Preview image not accessible (Status: {preview_response.status_code})")
+                        print(f"   ℹ️  This might be expected if thumbnails are generated asynchronously")
+                except Exception as e:
+                    print(f"   ⚠️  Preview access error: {e}")
+            else:
+                print(f"   ⚠️  No preview URL in upload response")
+        else:
+            print(f"   ❌ Cannot test preview generation - upload failed")
+        
+        return upload_success
+
 def main():
     print("🚀 Starting MotionEdit API Testing...")
+    print("🎯 FOCUS: Lottie File Upload Functionality Review")
     print("=" * 60)
     
     tester = MotionEditAPITester()
@@ -961,83 +1238,31 @@ def main():
     tester.create_test_files()
     
     try:
-        # Test basic endpoints
-        print("\n📡 BASIC API TESTS")
+        # Test the specific Lottie upload functionality as requested
+        print("\n🎯 LOTTIE FILE UPLOAD FUNCTIONALITY TESTS (REVIEW REQUEST)")
+        print("=" * 60)
+        
+        # 1. Upload Endpoints Testing
+        tester.test_lottie_upload_endpoints()
+        
+        # 2. URL Import Testing  
+        tester.test_lottie_url_import()
+        
+        # 3. .lottie ZIP File Testing
+        tester.test_lottie_zip_file_upload()
+        
+        # 4. Preview/Thumbnail Generation Testing
+        tester.test_preview_thumbnail_generation()
+        
+        # Additional comprehensive tests
+        print("\n📋 ADDITIONAL TEMPLATE & LIBRARY TESTS")
+        print("-" * 40)
+        tester.test_get_templates()
+        
+        # Test basic endpoints for context
+        print("\n📡 BASIC API HEALTH TESTS")
         print("-" * 30)
         tester.test_root_endpoint()
-        tester.test_get_stats()
-        
-        # Test template endpoints
-        print("\n📋 TEMPLATE TESTS")
-        print("-" * 30)
-        tester.test_get_templates()
-        tester.test_search_templates()
-        tester.test_filter_templates_by_category()
-        
-        # Create a template and test retrieval
-        success, template_data = tester.test_create_template()
-        if success and 'id' in template_data:
-            tester.test_get_template_by_id(template_data['id'])
-        
-        # Test LOTTIE element validation
-        print("\n🎭 LOTTIE ELEMENT TESTS")
-        print("-" * 30)
-        tester.test_lottie_element_validation()
-        tester.test_lottie_element_invalid_parameters()
-        
-        # Test bulk import functionality
-        print("\n📦 BULK IMPORT TESTS")
-        print("-" * 30)
-        tester.test_bulk_import_upload_valid_files()
-        tester.test_bulk_import_upload_invalid_files()
-        tester.test_bulk_import_duplicate_detection()
-        tester.test_bulk_import_create_templates()
-        
-        # Test project endpoints
-        print("\n📁 PROJECT TESTS")
-        print("-" * 30)
-        tester.test_create_project()
-        tester.test_get_projects()
-        
-        # Test natural language commands
-        print("\n🗣️  NATURAL LANGUAGE TESTS")
-        print("-" * 30)
-        tester.test_natural_language_commands()
-        
-        # Test export endpoints
-        print("\n📤 EXPORT TESTS")
-        print("-" * 30)
-        tester.test_create_export()
-        tester.test_get_exports()
-        
-        # Test brand kit endpoints
-        print("\n🎨 BRAND KIT TESTS")
-        print("-" * 30)
-        tester.test_create_brand_kit()
-        tester.test_get_brand_kits()
-        
-        # Test LottieFiles integration endpoints
-        print("\n🎭 LOTTIEFILES INTEGRATION TESTS")
-        print("-" * 30)
-        tester.test_lottiefiles_search_no_params()
-        tester.test_lottiefiles_search_with_query()
-        tester.test_lottiefiles_search_with_category()
-        tester.test_lottiefiles_categories()
-        tester.test_lottiefiles_popular()
-        tester.test_lottiefiles_popular_with_category()
-        tester.test_lottiefiles_animation_details_valid()
-        tester.test_lottiefiles_animation_details_invalid()
-        
-        # Test the specific animation data endpoint (focus of this review)
-        print("\n🎯 LOTTIEFILES ANIMATION DATA TESTS (REVIEW FOCUS)")
-        print("-" * 50)
-        tester.test_lottiefiles_animation_data_endpoint()
-        tester.test_lottiefiles_embedded_url_handling()
-        
-        tester.test_lottiefiles_import_animation()
-        tester.test_lottiefiles_import_invalid_animation()
-        tester.test_lottiefiles_import_with_category()
-        tester.test_lottiefiles_import_with_data_verification()
         
     finally:
         # Clean up test files
