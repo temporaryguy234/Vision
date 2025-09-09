@@ -12,7 +12,7 @@ from pathlib import Path
 def test_bulk_import_comprehensive():
     """Comprehensive test of all bulk import functionality"""
     
-    base_url = "https://motion-templates-1.preview.emergentagent.com"
+    base_url = "https://motion-templates-2.preview.emergentagent.com"
     test_files_dir = Path(tempfile.mkdtemp())
     
     print("🚀 Final Bulk Import Comprehensive Test")

@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 class ComprehensiveBulkImportTester:
-    def __init__(self, base_url="https://motion-templates-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://motion-templates-2.preview.emergentagent.com"):
         self.base_url = base_url
         self.test_files_dir = None
         

@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 
 class BulkImportTester:
-    def __init__(self, base_url="https://motion-templates-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://motion-templates-2.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
