@@ -136,210 +136,179 @@ const Layout = ({ children }) => {
   );
 };
 
-// Home/Explore Page (restored original clean design)
+// Home/Explore Page - Matching expected design
 const HomePage = () => {
+  const [featuredTemplates, setFeaturedTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const templatesData = await apiService.get('/templates?limit=6');
+        setFeaturedTemplates(templatesData.slice(0, 6));
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
+
+  const stats = [
+    { icon: User, value: '10K+', label: 'Active Creators', color: 'text-orange-600' },
+    { icon: Folder, value: '500+', label: 'Templates', color: 'text-blue-600' },
+    { icon: Globe, value: '95%', label: 'Time Saved', color: 'text-green-600' },
+    { icon: Settings, value: '2 Min', label: 'Avg. Edit Time', color: 'text-purple-600' },
+  ];
+
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Clean Hero Section - Original Style */}
-        <div className="text-center py-16 bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Create & Edit Motion Graphics
+    <div className="min-h-full">
+      {/* Hero Section */}
+      <section className="px-8 py-8">
+        <div className="max-w-7xl mx-auto text-center">
+          {/* New Badge */}
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 mb-6">
+            <span className="w-2 h-2 bg-orange-500 rounded-full mr-2 animate-pulse"></span>
+            <span className="text-sm font-medium text-orange-600">New: Natural Language Editing</span>
+          </div>
+
+          {/* Main Heading */}
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-5">
+            Your Motion Graphics
+            <br />
+            <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+              Template Library
+            </span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Import Lottie animations, edit with visual controls and AI prompts. Professional motion graphics made simple.
+
+          {/* Subheading */}
+          <p className="text-lg text-gray-600 mb-6 max-w-3xl mx-auto leading-relaxed">
+            Browse and customize professional templates for YouTube, TikTok, and
+            Instagram in minutes. No design experience required.
           </p>
-          
-          <div className="flex items-center justify-center space-x-4">
-            <Link
-              to="/upload"
-              className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
-            >
-              Upload Templates
-            </Link>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Link
               to="/library"
-              className="px-8 py-4 border-2 border-orange-500 text-orange-500 font-semibold rounded-xl hover:bg-orange-50 transition-colors"
+              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200 transform hover:scale-105"
             >
-              Browse Library
+              Browse Templates
+              <span className="ml-2">→</span>
             </Link>
+            <button className="inline-flex items-center px-8 py-4 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors">
+              Watch Demo
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Features Grid - Clean Design */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Upload className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">Import & Upload</h3>
-            <p className="text-gray-600">Drag & drop .json and .lottie files or import from URLs. Full support for After Effects exports.</p>
-          </div>
-          
-          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Edit className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">Visual Editor</h3>
-            <p className="text-gray-600">Edit text, colors, images and speed with live preview. Click elements to edit instantly.</p>
-          </div>
-          
-          <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Settings className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Prompts</h3>
-            <p className="text-gray-600">Use natural language: "make it faster", "change logo", "set color to blue". No technical skills needed.</p>
+      {/* Stats Section - Compact */}
+      <section className="px-8 py-8 bg-white/30 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {stats.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <div key={index} className="text-center">
+                  <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-r from-gray-50 to-white rounded-xl shadow-md mb-2">
+                    <Icon className={`w-5 h-5 ${stat.color}`} />
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 mb-1">{stat.value}</div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
+      </section>
 
-        {/* Recent Templates - Show Real Lottie Templates */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Templates</h2>
-              <p className="text-gray-600">Professional Lottie animations ready to customize</p>
-            </div>
+      {/* Featured Templates Section */}
+      <section className="px-8 py-12">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Featured Templates</h2>
+            <p className="text-gray-600">Handpicked templates to get you started</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {loading ? (
+              // Loading skeletons
+              Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="bg-white rounded-2xl shadow-lg overflow-hidden animate-pulse">
+                  <div className="aspect-video bg-gray-200"></div>
+                  <div className="p-6">
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                    <div className="flex gap-2">
+                      <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+                      <div className="h-6 bg-gray-200 rounded-full w-20"></div>
+                      <div className="h-6 bg-gray-200 rounded-full w-18"></div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              featuredTemplates.map((template) => (
+                <Link
+                  key={template.id}
+                  to={`/t/${template.id}`}
+                  className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105"
+                >
+                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                    {template.preview_image_url ? (
+                      <img
+                        src={template.preview_image_url}
+                        alt={template.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-24 h-24 bg-orange-200 rounded-lg flex items-center justify-center">
+                          <span className="text-2xl">🎬</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
+                  <div className="p-6">
+                    <div className="text-sm text-orange-600 font-medium mb-2">{template.category}</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">{template.title}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {template.tags && template.tags.length > 0 ? (
+                        template.tags.slice(0, 3).map((tag, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="px-3 py-1 bg-orange-100 text-orange-600 text-sm rounded-full">
+                          Lottie
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+
+          <div className="text-center mt-12">
             <Link
               to="/library"
-              className="text-orange-500 hover:text-orange-600 font-medium flex items-center"
+              className="inline-flex items-center px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
             >
-              View All
-              <span className="ml-1">→</span>
+              View All Templates
+              <span className="ml-2">→</span>
             </Link>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Lottie Template Cards */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="aspect-square bg-gradient-to-br from-orange-100 to-red-100 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24">
-                    {/* This will show actual Lottie animation */}
-                    <div className="w-full h-full bg-orange-200 rounded-lg flex items-center justify-center">
-                      <span className="text-2xl">🏷️</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                  <Link
-                    to="/t/demo-price-tag"
-                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
-                  >
-                    Edit Template
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">Price Tag</h3>
-                <p className="text-sm text-gray-600 mb-2">Editable discount badge</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-orange-500 bg-orange-50 px-2 py-1 rounded">Lottie</span>
-                  <span className="text-xs text-gray-500">2.1s</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="aspect-square bg-gradient-to-br from-green-100 to-teal-100 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24">
-                    <div className="w-full h-full bg-green-200 rounded-lg flex items-center justify-center">
-                      <span className="text-2xl">📈</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                  <Link
-                    to="/t/demo-chart"
-                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
-                  >
-                    Edit Template
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">Stock Chart</h3>
-                <p className="text-sm text-gray-600 mb-2">Animated data visualization</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-green-500 bg-green-50 px-2 py-1 rounded">Lottie</span>
-                  <span className="text-xs text-gray-500">4.0s</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="aspect-square bg-gradient-to-br from-blue-100 to-purple-100 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24">
-                    <div className="w-full h-full bg-blue-200 rounded-lg flex items-center justify-center">
-                      <span className="text-2xl">✨</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                  <Link
-                    to="/t/demo-loader"
-                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
-                  >
-                    Edit Template
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">Loading Animation</h3>
-                <p className="text-sm text-gray-600 mb-2">Smooth loading indicator</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">Lottie</span>
-                  <span className="text-xs text-gray-500">2.5s</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24">
-                    <div className="w-full h-full bg-purple-200 rounded-lg flex items-center justify-center">
-                      <span className="text-2xl">❤️</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                  <Link
-                    to="/t/demo-like"
-                    className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all"
-                  >
-                    Edit Template
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">Like Animation</h3>
-                <p className="text-sm text-gray-600 mb-2">Social media interaction</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-purple-500 bg-purple-50 px-2 py-1 rounded">Lottie</span>
-                  <span className="text-xs text-gray-500">1.8s</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-
-        {/* Call to Action */}
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create?</h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Upload your Lottie files or start with our templates. Edit with AI prompts and export professional videos.
-          </p>
-          <Link
-            to="/upload"
-            className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-200"
-          >
-            Get Started
-          </Link>
-        </div>
-      </div>
+      </section>
     </div>
   );
 };
