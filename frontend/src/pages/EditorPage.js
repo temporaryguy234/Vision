@@ -3,38 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
 
-// Import dotLottie player dynamically
-const DotLottiePlayer = React.lazy(() => 
-  import('@dotlottie/player-component').then(module => ({
-    default: React.forwardRef((props, ref) => {
-      useEffect(() => {
-        // Register the web component if not already registered
-        if (!customElements.get('dotlottie-player')) {
-          import('@dotlottie/player-component');
-        }
-      }, []);
-
-      // Use React.createElement to create the web component
-      return React.createElement('dotlottie-player', {
-        ...props,
-        ref,
-        autoplay: false,
-        loop: true,
-        controls: false,
-        mode: 'normal',
-        style: {
-          width: '100%',
-          height: '100%',
-          ...props.style
-        }
-      });
-    })
-  }))
-);
-
 const EditorPage = () => {
   const { templateId } = useParams();
-  const playerRef = useRef(null);
   const [template, setTemplate] = useState(null);
   const [animationData, setAnimationData] = useState(null);
   const [currentState, setCurrentState] = useState({});
@@ -51,24 +21,21 @@ const EditorPage = () => {
     loadTemplate();
   }, [templateId]);
 
-  // Initialize player when animation data is available
-  useEffect(() => {
-    if (animationData && playerRef.current) {
-      initializePlayer();
-    }
-  }, [animationData]);
-
   const loadTemplate = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      console.log('Loading template:', templateId);
+
       // Load template metadata
       const templateData = await apiService.get(`/templates/${templateId}`);
+      console.log('Template data loaded:', templateData);
       setTemplate(templateData);
 
       // Load animation data
       const animData = await apiService.get(`/templates/${templateId}/data`);
+      console.log('Animation data loaded:', animData);
       setAnimationData(animData);
 
       // Load saved revisions
@@ -86,105 +53,6 @@ const EditorPage = () => {
       setError('Failed to load template. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const initializePlayer = () => {
-    const player = playerRef.current;
-    if (!player || !animationData) {
-      console.log('Player or animation data not available:', { player: !!player, animationData: !!animationData });
-      return;
-    }
-
-    try {
-      console.log('Initializing player with animation data:', Object.keys(animationData));
-      
-      // The dotLottie player accepts either a URL or animation data object
-      // Let's try setting the src attribute directly since load() might not work
-      player.src = {
-        type: 'json',
-        data: animationData
-      };
-      
-      // Alternative approach: set attributes directly
-      player.loop = true;
-      player.autoplay = true;
-      player.speed = speed;
-      
-      // Set up event listeners
-      player.addEventListener('ready', () => {
-        console.log('Player ready, animation loaded successfully');
-        setIsPlaying(true);
-        applyCurrentState();
-      });
-
-      player.addEventListener('play', () => {
-        console.log('Player started');
-        setIsPlaying(true);
-      });
-      
-      player.addEventListener('pause', () => {
-        console.log('Player paused');
-        setIsPlaying(false);
-      });
-
-      player.addEventListener('error', (e) => {
-        console.error('Player error:', e);
-        setError('Failed to load animation');
-      });
-
-      player.addEventListener('load', () => {
-        console.log('Animation loaded into player');
-      });
-
-    } catch (err) {
-      console.error('Failed to initialize player:', err);
-      setError('Failed to initialize animation player');
-    }
-  };
-
-  const applyCurrentState = () => {
-    if (!playerRef.current || !currentState || Object.keys(currentState).length === 0) return;
-
-    try {
-      // Apply speed changes
-      if (currentState.speed !== undefined) {
-        setSpeed(currentState.speed);
-        playerRef.current.setSpeed(currentState.speed);
-      }
-
-      // Apply other state changes would go here
-      // This is a simplified version - full implementation would apply
-      // text changes, color changes, etc. to the animation data
-
-    } catch (err) {
-      console.error('Failed to apply state:', err);
-    }
-  };
-
-  const handlePlay = () => {
-    if (playerRef.current) {
-      if (isPlaying) {
-        playerRef.current.pause();
-      } else {
-        playerRef.current.play();
-      }
-    }
-  };
-
-  const handleSpeedChange = (newSpeed) => {
-    setSpeed(newSpeed);
-    setCurrentState(prev => ({ ...prev, speed: newSpeed }));
-    
-    if (playerRef.current) {
-      playerRef.current.speed = newSpeed;
-    }
-  };
-
-  const handleReset = () => {
-    if (playerRef.current) {
-      playerRef.current.seek(0);
-      playerRef.current.play();
     }
   };
 
@@ -235,7 +103,6 @@ const EditorPage = () => {
         });
         
         setCurrentState(newState);
-        applyCurrentState();
         
         // Clear prompt
         setPromptText('');
@@ -257,9 +124,6 @@ const EditorPage = () => {
       ...prev,
       [`text.${elementId}`]: newText
     }));
-    
-    // In a full implementation, this would update the animation data
-    // and refresh the player
   };
 
   const handleColorChange = (elementId, newColor) => {
@@ -267,9 +131,6 @@ const EditorPage = () => {
       ...prev,
       [`colors.${elementId}`]: newColor
     }));
-    
-    // In a full implementation, this would update the animation data
-    // and refresh the player
   };
 
   const handleImageChange = (elementId, newImageUrl) => {
@@ -277,9 +138,11 @@ const EditorPage = () => {
       ...prev,
       [`images.${elementId}`]: newImageUrl
     }));
-    
-    // In a full implementation, this would update the animation data
-    // and refresh the player
+  };
+
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
+    setCurrentState(prev => ({ ...prev, speed: newSpeed }));
   };
 
   if (loading) {
