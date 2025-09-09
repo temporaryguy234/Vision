@@ -177,7 +177,7 @@ const EditorPage = () => {
     setCurrentState(prev => ({ ...prev, speed: newSpeed }));
     
     if (playerRef.current) {
-      playerRef.current.setSpeed(newSpeed);
+      playerRef.current.speed = newSpeed;
     }
   };
 
