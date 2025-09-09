@@ -81,11 +81,14 @@ const EditorPage = () => {
 
   const initializePlayer = () => {
     const player = playerRef.current;
-    if (!player) return;
+    if (!player || !animationData) return;
 
     try {
-      // Load animation data
-      player.load(animationData);
+      console.log('Initializing player with animation data:', Object.keys(animationData));
+      
+      // For dotLottie player, we need to pass the JSON data directly
+      // The player.load() method accepts JSON data
+      player.load(JSON.stringify(animationData));
       
       // Set initial playback settings
       player.setSpeed(speed);
@@ -93,12 +96,25 @@ const EditorPage = () => {
       
       // Set up event listeners
       player.addEventListener('ready', () => {
-        console.log('Player ready');
+        console.log('Player ready, starting playback');
+        player.play();
         applyCurrentState();
       });
 
-      player.addEventListener('play', () => setIsPlaying(true));
-      player.addEventListener('pause', () => setIsPlaying(false));
+      player.addEventListener('play', () => {
+        console.log('Player started');
+        setIsPlaying(true);
+      });
+      
+      player.addEventListener('pause', () => {
+        console.log('Player paused');
+        setIsPlaying(false);
+      });
+
+      player.addEventListener('error', (e) => {
+        console.error('Player error:', e);
+        setError('Failed to load animation');
+      });
 
     } catch (err) {
       console.error('Failed to initialize player:', err);
