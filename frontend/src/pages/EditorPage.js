@@ -423,16 +423,23 @@ const EditorPage = () => {
             </div>
             
             <div>
+              <h4 className="font-medium text-gray-700">Animation Loaded:</h4>
+              <p className="text-gray-600">{animationData ? 'Yes' : 'No'}</p>
+            </div>
+
+            {animationData && (
+              <div>
+                <h4 className="font-medium text-gray-700">Animation Info:</h4>
+                <p className="text-gray-600">
+                  {animationData.w}x{animationData.h}, {animationData.fr}fps, {animationData.layers?.length || 0} layers
+                </p>
+              </div>
+            )}
+            
+            <div>
               <h4 className="font-medium text-gray-700">Current State:</h4>
               <pre className="text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
                 {JSON.stringify(currentState, null, 2)}
-              </pre>
-            </div>
-            
-            <div>
-              <h4 className="font-medium text-gray-700">Manifest:</h4>
-              <pre className="text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
-                {JSON.stringify(template?.manifest || {}, null, 2)}
               </pre>
             </div>
           </div>
