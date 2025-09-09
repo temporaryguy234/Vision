@@ -253,19 +253,18 @@ const EditorPage = () => {
           <div className="flex-1 flex items-center justify-center p-8 bg-gray-100">
             <div className="relative bg-white rounded-lg shadow-lg overflow-hidden" style={{width: '400px', height: '400px'}}>
               {animationData ? (
-                <React.Suspense fallback={
-                  <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
-                    <div className="text-gray-500">Loading animation...</div>
+                <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300">
+                  <div className="text-center">
+                    <div className="text-4xl mb-2">🎬</div>
+                    <div className="text-sm text-gray-600">Lottie Animation Loaded</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {animationData.w}x{animationData.h} • {animationData.fr}fps
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {animationData.layers?.length || 0} layers
+                    </div>
                   </div>
-                }>
-                  <DotLottiePlayer
-                    ref={playerRef}
-                    style={{
-                      width: '400px',
-                      height: '400px'
-                    }}
-                  />
-                </React.Suspense>
+                </div>
               ) : (
                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                   <div className="text-gray-500">No animation loaded</div>
