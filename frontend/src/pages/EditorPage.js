@@ -138,7 +138,7 @@ const EditorPage = () => {
         continue;
       }
 
-      // Images (replace asset URL)
+      // Images
       if (path.startsWith('/images/')) {
         const id = path.split('/')[2];
         const img = (manifest?.images || []).find(x => x.id === id);
@@ -153,34 +153,32 @@ const EditorPage = () => {
         continue;
       }
 
-      // Font family for all text layers
+      // Font family
       if (path === '/font/family') {
         const family = String(value || '').trim();
-        // Update fonts list if present
         if (updated.fonts?.list && Array.isArray(updated.fonts.list)) {
           if (!updated.fonts.list.find(f => f.fFamily === family || f.fName === family)) {
             updated.fonts.list.push({ fName: family, fFamily: family, fStyle: 'Regular', ascent: 75 });
           }
         }
-        // Update each text element's style
         (manifest?.text || []).forEach(t => {
-          const sel = t.selector?.replace(/\.t$/, '.f'); // try to map to font family field
+          const sel = t.selector?.replace(/\.t$/, '.f');
           if (sel) setBySelector(updated, sel, family);
         });
         continue;
       }
 
-      // Font size for all text layers
+      // Font size
       if (path === '/font/size') {
         const size = Number(value) || 24;
         (manifest?.text || []).forEach(t => {
-          const sel = t.selector?.replace(/\.t$/, '.s.s'); // s.s is size
+          const sel = t.selector?.replace(/\.t$/, '.s.s');
           if (sel) setBySelector(updated, sel, size);
         });
         continue;
       }
 
-      // Canvas aspect ratio / size
+      // Canvas aspect ratio handled in caller by setCanvasSize
       if (path === '/canvas/aspect') {
         const preset = (value || '').toString().toLowerCase();
         if (preset.includes('16:9') || preset.includes('youtube') || preset.includes('widescreen')) {
@@ -190,6 +188,40 @@ const EditorPage = () => {
         } else if (preset.includes('1:1') || preset.includes('square') || preset.includes('instagram post')) {
           setCanvasSize({ width: 1080, height: 1080 });
         }
+        continue;
+      }
+
+      // Transforms
+      if (path === '/transform/op' && value && typeof value === 'object') {
+        const { type, factor, degrees, dx, dy, targetLabel } = value;
+        // Affect matching text layers by label; fallback to first text layer
+        const targets = (manifest?.text || []).filter(t => !targetLabel || (t.label || '').toLowerCase().includes(targetLabel));
+        const targetList = targets.length > 0 ? targets : (manifest?.text || []).slice(0, 1);
+        targetList.forEach(t => {
+          // Map text selector to the layer index to modify transform keys
+          const m = /layers\[(\d+)\]/.exec(t.selector || '');
+          if (!m) return;
+          const li = parseInt(m[1], 10);
+          const layer = updated.layers?.[li];
+          if (!layer) return;
+          const ks = layer.ks || (layer.ks = {});
+          // Position
+          if (type === 'translate' && (dx || dy)) {
+            const p = ks.p || (ks.p = { a: 0, k: [layer.ks?.p?.k?.[0] || 0, layer.ks?.p?.k?.[1] || 0, 0] });
+            const k = Array.isArray(p.k) ? p.k : [0, 0, 0];
+            p.k = [k[0] + (dx || 0), k[1] + (dy || 0), 0];
+          }
+          // Scale (percentage)
+          if (type === 'scale' && factor) {
+            const s = ks.s || (ks.s = { a: 0, k: [100, 100, 100] });
+            s.k = [Math.round(s.k[0] * factor), Math.round(s.k[1] * factor), 100];
+          }
+          // Rotation
+          if (type === 'rotate' && typeof degrees === 'number') {
+            const r = ks.r || (ks.r = { a: 0, k: 0 });
+            r.k = (r.k || 0) + degrees;
+          }
+        });
         continue;
       }
     }
@@ -363,7 +395,7 @@ const EditorPage = () => {
           
           {/* Player Area */}
           <div className="flex-1 flex items-center justify-center p-8 bg-gray-100">
-            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center" style={{width: '400px', height: '400px'}}>
+            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center" style={{width: `${canvasSize.width}px`, height: `${canvasSize.height}px`}}>
               {animationData ? (
                 <LottieRenderer
                   animationData={animationData}

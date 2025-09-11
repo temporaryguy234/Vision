@@ -592,6 +592,25 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
                 return hx
         return None
 
+    # Helpers to find element IDs by label
+    def find_text_id_by_label(label: str) -> Optional[str]:
+        for it in text_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
+    def find_color_id_by_label(label: str) -> Optional[str]:
+        for it in color_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
+    def find_image_id_by_label(label: str) -> Optional[str]:
+        for it in image_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
     # 1) Speed changes: "make it 30% faster", "reduce speed by 20%", "speed 1.5x"
     if any(k in prompt_lower for k in ["faster", "slower", "speed", "playback"]):
         # explicit factor like 1.5x
@@ -613,7 +632,7 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
                 elif "slower" in prompt_lower or "reduce" in prompt_lower or "lower" in prompt_lower:
                     patches.append({"op":"replace","path":"/speed","value": 0.8})
 
-    # 2) Text changes: "change title to Hello World", "set headline to \"Sale\""
+    # 2) Text changes: global or targeted ("change title to ...")
     m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+"([^"]+)"', prompt_norm, flags=re.I)
     if not m:
         m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+([^\n]+)$', prompt_norm, flags=re.I)
@@ -624,19 +643,24 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
         if target:
             patches.append({"op":"replace","path":f"/text/{target['id']}","value":value})
 
-    # 3) Color changes: "set primary color to #ff6a00", "make chart bar color blue"
+    # 3) Color changes: "set {label} color to #ff6a00" or "make stroke blue"
     color_hex = parse_color_hex(prompt_norm)
     if color_hex and color_elements:
-        # Try to match by label keyword before defaulting to first
         target = None
-        for token in ["primary","secondary","stroke","fill","background","chart","title","text"]:
-            if token in prompt_lower:
-                target = find_by_label(color_elements, token)
-                if target:
-                    break
+        # target by explicit '{label} color'
+        m = re.search(r'(title|headline|stroke|fill|background|primary|secondary|text|logo)[^\n]*color', prompt_lower)
+        if m:
+            target = find_by_label(color_elements, m.group(1))
         if not target:
+            for token in ["primary","secondary","stroke","fill","background","chart","title","text"]:
+                if token in prompt_lower:
+                    target = find_by_label(color_elements, token)
+                    if target:
+                        break
+        if not target and color_elements:
             target = color_elements[0]
-        patches.append({"op":"replace","path":f"/colors/{target['id']}","value":color_hex})
+        if target:
+            patches.append({"op":"replace","path":f"/colors/{target['id']}","value":color_hex})
 
     # 4) Image swap: "change logo to https://...png"
     m = re.search(r'(logo|image|picture|photo|icon)[^\S\n]*to\s+(https?://\S+)', prompt_norm, flags=re.I)
@@ -671,30 +695,42 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
         elif any(k in prompt_lower for k in ["1:1","square","instagram post"]):
             patches.append({"op":"replace","path":"/canvas/aspect","value":"1:1"})
 
-    # 7) Transform/motion: scale, rotate, move
+    # 7) Transform/motion: scale, rotate, move (with optional target label)
     # Scale
-    m = re.search(r'(scale|bigger|smaller)\s*(\d+(?:\.\d+)?)\s*%?', prompt_lower)
+    m = re.search(r'(?:scale|make)\s+(?:(\w+)\s+)?(bigger|smaller|by\s+\d+(?:\.\d+)?%|\d+(?:\.\d+)?x)', prompt_lower)
     if m:
-        amt = float(m.group(2))
-        factor = amt/100.0 if '%' in prompt_lower or m.group(1) in ["bigger","smaller"] else amt
-        if m.group(1) == 'smaller' and factor > 0:
-            factor = 1.0 - factor
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"scale","factor": round(factor if factor>1 else (1+factor if factor<1 else 1.0), 2), "target":"text"}})
+        target_label = m.group(1)
+        token = m.group(2)
+        factor = 1.0
+        pm = re.search(r'(\d+(?:\.\d+)?)\s*x', token)
+        if pm:
+            factor = float(pm.group(1))
+        else:
+            pm = re.search(r'(\d+(?:\.\d+)?)\s*%', token)
+            if pm:
+                factor = 1.0 + float(pm.group(1))/100.0
+            elif 'bigger' in token:
+                factor = 1.2
+            elif 'smaller' in token:
+                factor = 0.8
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"scale","factor": round(factor, 2), "targetLabel": target_label}})
 
     # Rotate
-    m = re.search(r'rotate\s+(\-?\d+(?:\.\d+)?)\s*(deg|degree|degrees)?', prompt_lower)
+    m = re.search(r'rotate\s+(?:(\w+)\s+)?(\-?\d+(?:\.\d+)?)\s*(deg|degree|degrees)?', prompt_lower)
     if m:
-        deg = float(m.group(1))
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"rotate","degrees": deg, "target":"text"}})
+        target_label = m.group(1)
+        deg = float(m.group(2))
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"rotate","degrees": deg, "targetLabel": target_label}})
 
     # Move
-    m = re.search(r'move\s+(left|right|up|down)\s+(\d+(?:\.\d+)?)\s*(px|pixels)?', prompt_lower)
+    m = re.search(r'move\s+(?:(\w+)\s+)?(left|right|up|down)\s+(\d+(?:\.\d+)?)\s*(px|pixels)?', prompt_lower)
     if m:
-        dir = m.group(1)
-        amt = float(m.group(2))
+        target_label = m.group(1)
+        dir = m.group(2)
+        amt = float(m.group(3))
         dx = (-amt if dir=="left" else amt if dir=="right" else 0)
         dy = (-amt if dir=="up" else amt if dir=="down" else 0)
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"translate","dx": dx, "dy": dy, "target":"text"}})
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"translate","dx": dx, "dy": dy, "targetLabel": target_label}})
 
     return patches
 
