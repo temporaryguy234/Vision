@@ -134,18 +134,21 @@ const TemplatesPage = () => {
             filteredTemplates.map((template) => (
               <Link
                 key={template.id}
-                to={`/editor/${template.id}`}
+                to={`/t/${template.id}`}
                 className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
               >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   <img
-                    src={template.preview}
+                    src={template.preview_image_url || template.preview_url || ''}
                     alt={template.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-4 left-4 text-white">
-                      <span className="text-sm font-medium">{template.duration}</span>
+                      {template.duration && (
+                        <span className="text-sm font-medium">{template.duration}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -157,21 +160,23 @@ const TemplatesPage = () => {
                     )}
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">{template.title}</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {template.tags.slice(0, 3).map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {template.tags.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{template.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
+                  {Array.isArray(template.tags) && template.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {template.tags.slice(0, 3).map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {template.tags.length > 3 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          +{template.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Link>
             ))

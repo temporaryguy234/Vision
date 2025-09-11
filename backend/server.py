@@ -26,15 +26,157 @@ logger = logging.getLogger(__name__)
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 DB_NAME = "motionedit"
 
+class FileCursor:
+    def __init__(self, items):
+        self._items = items
+        self._skip = 0
+        self._limit = None
+        self._sort = None
+
+    def skip(self, n: int):
+        self._skip = n
+        return self
+
+    def limit(self, n: int):
+        self._limit = n
+        return self
+
+    def sort(self, key: str, direction: int):
+        reverse = direction < 0
+        self._sort = (key, reverse)
+        return self
+
+    async def to_list(self, length=None):
+        items = list(self._items)
+        if self._sort:
+            key, reverse = self._sort
+            items.sort(key=lambda x: x.get(key), reverse=reverse)
+        if self._skip:
+            items = items[self._skip :]
+        if self._limit is not None:
+            items = items[: self._limit]
+        return items
+
+
+class FileCollection:
+    def __init__(self, file_path: Path):
+        self.file_path = file_path
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.file_path.exists():
+            self._write_sync([])
+
+    async def insert_one(self, doc: Dict[str, Any]):
+        docs = await self._read()
+        docs.append(doc)
+        await self._write(docs)
+        return {"inserted_id": doc.get("id")}
+
+    def find(self, filter_query: Dict[str, Any]):
+        # Simple filtering supporting equality only
+        docs = self._read_sync()
+        def match(d):
+            for k, v in filter_query.items():
+                if d.get(k) != v:
+                    return False
+            return True
+        matched = [d for d in docs if match(d)] if filter_query else docs
+        return FileCursor(matched)
+
+    async def find_one(self, filter_query: Dict[str, Any]):
+        cursor = self.find(filter_query)
+        items = await cursor.to_list()
+        return items[0] if items else None
+
+    async def update_one(self, filter_query: Dict[str, Any], update: Dict[str, Any]):
+        docs = await self._read()
+        matched = 0
+        for i, d in enumerate(docs):
+            ok = True
+            for k, v in filter_query.items():
+                if d.get(k) != v:
+                    ok = False
+                    break
+            if ok:
+                set_data = update.get("$set", {})
+                d.update(set_data)
+                docs[i] = d
+                matched = 1
+                break
+        if matched:
+            await self._write(docs)
+        return type("Res", (), {"matched_count": matched})
+
+    async def delete_many(self, filter_query: Dict[str, Any]):
+        docs = await self._read()
+        if not filter_query:
+            deleted = len(docs)
+            docs = []
+        else:
+            before = len(docs)
+            def match(d):
+                for k, v in filter_query.items():
+                    if d.get(k) != v:
+                        return False
+                return True
+            docs = [d for d in docs if not match(d)]
+            deleted = before - len(docs)
+        await self._write(docs)
+        return {"deleted_count": deleted}
+
+    async def count_documents(self, filter_query: Dict[str, Any]):
+        return len(await self.find(filter_query).to_list())
+
+    async def _read(self):
+        async with aiofiles.open(self.file_path, "r", encoding="utf-8") as f:
+            content = await f.read()
+            return json.loads(content or "[]")
+
+    def _read_sync(self):
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                return json.loads(f.read() or "[]")
+        except FileNotFoundError:
+            return []
+
+    async def _write(self, docs: List[Dict[str, Any]]):
+        async with aiofiles.open(self.file_path, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(docs, indent=2))
+
+    def _write_sync(self, docs: List[Dict[str, Any]]):
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(docs, indent=2))
+
+
+class FileDB:
+    def __init__(self, base_dir: Path):
+        db_dir = base_dir / "db"
+        self.templates = FileCollection(db_dir / "templates.json")
+        self.template_revisions = FileCollection(db_dir / "template_revisions.json")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    app.mongodb_client = AsyncIOMotorClient(MONGO_URL)
-    app.mongodb = app.mongodb_client[DB_NAME]
-    logger.info("Connected to MongoDB")
+    # Startup: try Mongo, otherwise fallback to file DB
+    use_file_db = False
+    app.mongodb_client = None
+    app.mongodb = None
+    try:
+        app.mongodb_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=1000)
+        await app.mongodb_client.admin.command("ping")
+        app.mongodb = app.mongodb_client[DB_NAME]
+        logger.info("Connected to MongoDB")
+    except Exception as e:
+        logger.warning(f"MongoDB not available, using file DB. Reason: {e}")
+        use_file_db = True
+
+    # Expose unified db accessor
+    app.file_db = FileDB(Path(os.environ.get('UPLOADS_DIR', str(Path(__file__).parent.parent / 'uploads')))) if use_file_db else None
+
     yield
+
     # Shutdown
-    app.mongodb_client.close()
+    if app.mongodb_client:
+        app.mongodb_client.close()
 
 app = FastAPI(title="MotionEdit API", lifespan=lifespan)
 
@@ -47,9 +189,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create uploads directory
-UPLOADS_DIR = Path("/app/uploads")
-UPLOADS_DIR.mkdir(exist_ok=True)
+# Create uploads directory (configurable)
+UPLOADS_DIR = Path(os.environ.get('UPLOADS_DIR', str(Path(__file__).parent.parent / 'uploads')))
+UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
+(
+    UPLOADS_DIR / "previews"
+).mkdir(exist_ok=True, parents=True)
 
 # Mount static files
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
@@ -59,7 +204,8 @@ api_router = APIRouter(prefix="/api")
 
 # Database dependency
 def get_database():
-    return app.mongodb
+    # Prefer Mongo if available, otherwise file DB
+    return app.mongodb if getattr(app, 'mongodb', None) else app.file_db
 
 # Template Upload and Processing
 @api_router.post("/templates/upload")
@@ -251,7 +397,11 @@ async def get_template_animation_data(template_id: str, db=Depends(get_database)
             raise HTTPException(status_code=404, detail="Template not found")
         
         # Read the animation file
-        file_path = Path("/app" + template["file_url"])
+        file_url: str = template.get("file_url", "")
+        if not file_url.startswith("/uploads/"):
+            raise HTTPException(status_code=404, detail="Invalid animation file path")
+        relative = file_url[len("/uploads/"):]
+        file_path = UPLOADS_DIR / relative
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Animation file not found")
         

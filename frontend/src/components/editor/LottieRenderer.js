@@ -10,7 +10,8 @@ const LottieRenderer = ({
   isPlaying,
   onClick,
   onDragStart,
-  className = ""
+  className = "",
+  animationData: externalAnimationData
 }) => {
   const lottieRef = useRef(null);
 
@@ -38,8 +39,18 @@ const LottieRenderer = ({
   const [error, setError] = React.useState(null);
 
   useEffect(() => {
+    const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+    // If external data is provided, use it directly
+    if (externalAnimationData) {
+      setAnimationData(externalAnimationData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     if (!sourceUrl) {
-      setError('No source URL provided');
+      setError('No source provided');
       setLoading(false);
       return;
     }
@@ -48,26 +59,24 @@ const LottieRenderer = ({
       try {
         setLoading(true);
         setError(null);
-        
+
         let data;
-        
-        // Handle embedded animations via API
+
         if (sourceUrl.startsWith('embedded://')) {
           const animationId = sourceUrl.replace('embedded://', '');
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/lottiefiles/animation/${animationId}/data`);
-          if (!response.ok) {
-            throw new Error(`Failed to load embedded animation: ${response.status}`);
-          }
+          const response = await fetch(`${backendBase}/api/lottiefiles/animation/${animationId}/data`);
+          if (!response.ok) throw new Error(`Failed to load embedded animation: ${response.status}`);
+          data = await response.json();
+        } else if (sourceUrl.startsWith('/uploads/')) {
+          const response = await fetch(`${backendBase}${sourceUrl}`);
+          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
           data = await response.json();
         } else {
-          // Handle external URLs
           const response = await fetch(sourceUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to load animation: ${response.status}`);
-          }
+          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
           data = await response.json();
         }
-        
+
         setAnimationData(data);
       } catch (err) {
         console.error('Error loading Lottie animation:', err);
@@ -78,7 +87,7 @@ const LottieRenderer = ({
     };
 
     loadAnimation();
-  }, [sourceUrl]);
+  }, [sourceUrl, externalAnimationData]);
 
   if (loading) {
     return (

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
+import LottieRenderer from '../components/editor/LottieRenderer';
 
 const EditorPage = () => {
   const { templateId } = useParams();
@@ -243,20 +244,16 @@ const EditorPage = () => {
           
           {/* Player Area */}
           <div className="flex-1 flex items-center justify-center p-8 bg-gray-100">
-            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden" style={{width: '400px', height: '400px'}}>
+            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center" style={{width: '400px', height: '400px'}}>
               {animationData ? (
-                <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">🎬</div>
-                    <div className="text-sm text-gray-600">Lottie Animation Loaded</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {animationData.w}x{animationData.h} • {animationData.fr}fps
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {animationData.layers?.length || 0} layers
-                    </div>
-                  </div>
-                </div>
+                <LottieRenderer
+                  animationData={animationData}
+                  isPlaying={isPlaying}
+                  speed={speed}
+                  loop={true}
+                  autoplay={true}
+                  className="w-full h-full"
+                />
               ) : (
                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                   <div className="text-gray-500">No animation loaded</div>
