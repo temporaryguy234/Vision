@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
 import LottieRenderer from '../components/editor/LottieRenderer';
+import LottieRenderer from '../components/editor/LottieRenderer';
 
 const EditorPage = () => {
   const { templateId } = useParams();
@@ -11,6 +12,7 @@ const EditorPage = () => {
   const [currentState, setCurrentState] = useState({});
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1.0);
+  const [canvasSize, setCanvasSize] = useState({ width: 400, height: 400 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -77,6 +79,124 @@ const EditorPage = () => {
     }
   };
 
+  const setBySelector = (obj, selector, value) => {
+    // Supports selectors like: layers[0].t.d.k[0].s.t
+    try {
+      const tokens = selector.replace(/\]/g, '').split(/\.|\[/).filter(Boolean);
+      let cursor = obj;
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const key = isNaN(+tokens[i]) ? tokens[i] : +tokens[i];
+        if (cursor[key] === undefined) return false;
+        cursor = cursor[key];
+      }
+      const last = tokens[tokens.length - 1];
+      const lastKey = isNaN(+last) ? last : +last;
+      cursor[lastKey] = value;
+      return true;
+    } catch (e) {
+      console.warn('setBySelector failed', selector, e);
+      return false;
+    }
+  };
+
+  const hexToRgbaArray = (hex) => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!m) return [1, 1, 1, 1];
+    const r = parseInt(m[1], 16) / 255;
+    const g = parseInt(m[2], 16) / 255;
+    const b = parseInt(m[3], 16) / 255;
+    return [r, g, b, 1];
+  };
+
+  const applyPatchesToAnimation = (patches, manifest, anim) => {
+    if (!patches || patches.length === 0 || !anim) return anim;
+    const updated = JSON.parse(JSON.stringify(anim));
+
+    for (const patch of patches) {
+      const { op, path, value } = patch;
+      if (op !== 'replace') continue;
+
+      // Speed
+      if (path === '/speed') {
+        setSpeed(typeof value === 'number' ? value : 1.0);
+        continue;
+      }
+
+      // Text
+      if (path.startsWith('/text/')) {
+        const id = path.split('/')[2];
+        const t = (manifest?.text || []).find(x => x.id === id);
+        if (t?.selector) setBySelector(updated, t.selector, value);
+        continue;
+      }
+
+      // Colors
+      if (path.startsWith('/colors/')) {
+        const id = path.split('/')[2];
+        const c = (manifest?.colors || []).find(x => x.id === id);
+        if (c?.selector) setBySelector(updated, c.selector, hexToRgbaArray(value));
+        continue;
+      }
+
+      // Images (replace asset URL)
+      if (path.startsWith('/images/')) {
+        const id = path.split('/')[2];
+        const img = (manifest?.images || []).find(x => x.id === id);
+        const assetId = img?.asset_id;
+        if (assetId && Array.isArray(updated.assets)) {
+          const asset = updated.assets.find(a => a.id === assetId);
+          if (asset) {
+            asset.u = '';
+            asset.p = value;
+          }
+        }
+        continue;
+      }
+
+      // Font family for all text layers
+      if (path === '/font/family') {
+        const family = String(value || '').trim();
+        // Update fonts list if present
+        if (updated.fonts?.list && Array.isArray(updated.fonts.list)) {
+          if (!updated.fonts.list.find(f => f.fFamily === family || f.fName === family)) {
+            updated.fonts.list.push({ fName: family, fFamily: family, fStyle: 'Regular', ascent: 75 });
+          }
+        }
+        // Update each text element's style
+        (manifest?.text || []).forEach(t => {
+          const sel = t.selector?.replace(/\.t$/, '.f'); // try to map to font family field
+          if (sel) setBySelector(updated, sel, family);
+        });
+        continue;
+      }
+
+      // Font size for all text layers
+      if (path === '/font/size') {
+        const size = Number(value) || 24;
+        (manifest?.text || []).forEach(t => {
+          const sel = t.selector?.replace(/\.t$/, '.s.s'); // s.s is size
+          if (sel) setBySelector(updated, sel, size);
+        });
+        continue;
+      }
+
+      // Canvas aspect ratio / size
+      if (path === '/canvas/aspect') {
+        const preset = (value || '').toString().toLowerCase();
+        if (preset.includes('16:9') || preset.includes('youtube') || preset.includes('widescreen')) {
+          setCanvasSize({ width: 1280, height: 720 });
+        } else if (preset.includes('9:16') || preset.includes('vertical') || preset.includes('tiktok') || preset.includes('story') || preset.includes('reel')) {
+          setCanvasSize({ width: 720, height: 1280 });
+        } else if (preset.includes('1:1') || preset.includes('square') || preset.includes('instagram post')) {
+          setCanvasSize({ width: 1080, height: 1080 });
+        }
+        continue;
+      }
+    }
+
+    return updated;
+  };
+
   const handlePrompt = async () => {
     if (!promptText.trim()) return;
 
@@ -92,18 +212,17 @@ const EditorPage = () => {
       // Apply patches from AI response
       if (response.patches && response.patches.length > 0) {
         const newState = { ...currentState };
-        
         response.patches.forEach(patch => {
           if (patch.op === 'replace') {
-            // Apply patch to state
             const pathParts = patch.path.split('/').filter(p => p);
-            if (pathParts.length > 0) {
-              newState[pathParts.join('.')] = patch.value;
-            }
+            if (pathParts.length > 0) newState[pathParts.join('.')] = patch.value;
           }
         });
-        
         setCurrentState(newState);
+
+        // Apply directly to animation JSON
+        const updatedAnim = applyPatchesToAnimation(response.patches, template?.manifest || {}, animationData);
+        if (updatedAnim) setAnimationData(updatedAnim);
         
         // Clear prompt
         setPromptText('');

@@ -662,6 +662,40 @@ async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Di
                 amt = float(m.group(2)) / 100.0
                 patches.append({"op":"replace","path":"/chart/op","value":{"type":"delta_percent","index":idx,"amount":amt}})
 
+    # 6) Canvas aspect ratio presets
+    if any(k in prompt_lower for k in ["16:9","9:16","1:1","youtube","instagram","tiktok","vertical","square","widescreen","story","reel"]):
+        if any(k in prompt_lower for k in ["16:9","youtube","widescreen"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"16:9"})
+        elif any(k in prompt_lower for k in ["9:16","vertical","tiktok","story","reel"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"9:16"})
+        elif any(k in prompt_lower for k in ["1:1","square","instagram post"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"1:1"})
+
+    # 7) Transform/motion: scale, rotate, move
+    # Scale
+    m = re.search(r'(scale|bigger|smaller)\s*(\d+(?:\.\d+)?)\s*%?', prompt_lower)
+    if m:
+        amt = float(m.group(2))
+        factor = amt/100.0 if '%' in prompt_lower or m.group(1) in ["bigger","smaller"] else amt
+        if m.group(1) == 'smaller' and factor > 0:
+            factor = 1.0 - factor
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"scale","factor": round(factor if factor>1 else (1+factor if factor<1 else 1.0), 2), "target":"text"}})
+
+    # Rotate
+    m = re.search(r'rotate\s+(\-?\d+(?:\.\d+)?)\s*(deg|degree|degrees)?', prompt_lower)
+    if m:
+        deg = float(m.group(1))
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"rotate","degrees": deg, "target":"text"}})
+
+    # Move
+    m = re.search(r'move\s+(left|right|up|down)\s+(\d+(?:\.\d+)?)\s*(px|pixels)?', prompt_lower)
+    if m:
+        dir = m.group(1)
+        amt = float(m.group(2))
+        dx = (-amt if dir=="left" else amt if dir=="right" else 0)
+        dy = (-amt if dir=="up" else amt if dir=="down" else 0)
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"translate","dx": dx, "dy": dy, "target":"text"}})
+
     return patches
 
 # Include router
