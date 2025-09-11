@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Grid, List } from 'lucide-react';
 import { apiService } from '../services/api';
+import LottieRenderer from '../components/editor/LottieRenderer';
 
 const TemplatesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +49,106 @@ const TemplatesPage = () => {
   }, [selectedCategory, searchQuery]);
 
   const filteredTemplates = templates;
+
+  const TemplateCard = ({ template }) => {
+    const [hovered, setHovered] = useState(false);
+    const videoRef = useRef(null);
+
+    useEffect(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      try {
+        if (hovered) {
+          v.play().catch(() => {});
+        } else {
+          v.pause();
+          v.currentTime = 0;
+        }
+      } catch (_) {}
+    }, [hovered]);
+
+    return (
+      <Link
+        key={template.id}
+        to={`/t/${template.id}`}
+        className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+          {/* Base thumbnail image */}
+          {template.preview_image_url || template.preview_url ? (
+            <img
+              src={template.preview_image_url || template.preview_url}
+              alt={template.title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-500">No preview</div>
+          )}
+
+          {/* Hover animated preview: prefer video if available */}
+          {template.preview_video_url ? (
+            <video
+              ref={videoRef}
+              src={template.preview_video_url}
+              className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+            />
+          ) : template.file_url ? (
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none flex items-center justify-center">
+              <LottieRenderer
+                sourceUrl={template.file_url}
+                isPlaying={hovered}
+                autoplay={false}
+                loop={true}
+                speed={1.0}
+                className="w-full h-full"
+              />
+            </div>
+          ) : null}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-4 left-4 text-white">
+              {template.duration && (
+                <span className="text-sm font-medium">{template.duration}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-orange-600 font-medium">{template.category}</span>
+            {template.is_public && (
+              <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Public</span>
+            )}
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">{template.title}</h3>
+          {Array.isArray(template.tags) && template.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {template.tags.slice(0, 3).map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+              {template.tags.length > 3 && (
+                <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                  +{template.tags.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </Link>
+    );
+  };
 
   return (
     <div className="p-8">
@@ -132,48 +233,7 @@ const TemplatesPage = () => {
             ))
           ) : (
             filteredTemplates.map((template) => (
-              <Link
-                key={template.id}
-                to={`/editor/${template.id}`}
-                className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
-              >
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  <img
-                    src={template.preview}
-                    alt={template.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-4 left-4 text-white">
-                      <span className="text-sm font-medium">{template.duration}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-orange-600 font-medium">{template.category}</span>
-                    {template.is_public && (
-                      <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Public</span>
-                    )}
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">{template.title}</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {template.tags.slice(0, 3).map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {template.tags.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{template.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
+              <TemplateCard key={template.id} template={template} />
             ))
           )}
         </div>

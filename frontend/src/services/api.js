@@ -72,6 +72,16 @@ export const apiService = {
     return response.data;
   },
 
+  async uploadTemplatePreviews(templateId, { imageFile, videoFile }) {
+    const form = new FormData();
+    if (imageFile) form.append('image', imageFile);
+    if (videoFile) form.append('video', videoFile);
+    const response = await api.post(`/templates/${templateId}/previews`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
   // Template Revisions
   async saveRevision(templateId, revisionData) {
     const response = await api.post(`/templates/${templateId}/revisions`, revisionData);

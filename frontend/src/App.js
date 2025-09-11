@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { apiService } from './services/api';
+import LottieRenderer from './components/editor/LottieRenderer';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
@@ -253,50 +254,65 @@ const HomePage = () => {
                 </div>
               ))
             ) : (
-              featuredTemplates.map((template) => (
-                <Link
-                  key={template.id}
-                  to={`/t/${template.id}`}
-                  className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105"
-                >
-                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                    {template.preview_image_url ? (
-                      <img
-                        src={template.preview_image_url}
-                        alt={template.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-24 h-24 bg-orange-200 rounded-lg flex items-center justify-center">
-                          <span className="text-2xl">🎬</span>
+              featuredTemplates.map((template) => {
+                const [hovered, setHovered] = [false, () => {}];
+                const videoRef = { current: null };
+                return (
+                  <Link
+                    key={template.id}
+                    to={`/t/${template.id}`}
+                    className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105"
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                      {template.preview_image_url ? (
+                        <img
+                          src={template.preview_image_url}
+                          alt={template.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      ) : template.file_url ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <LottieRenderer
+                            sourceUrl={template.file_url}
+                            isPlaying={true}
+                            autoplay={true}
+                            loop={true}
+                            speed={1.0}
+                            className="w-full h-full"
+                          />
                         </div>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  </div>
-                  <div className="p-6">
-                    <div className="text-sm text-orange-600 font-medium mb-2">{template.category}</div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">{template.title}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {template.tags && template.tags.length > 0 ? (
-                        template.tags.slice(0, 3).map((tag, index) => (
-                          <span
-                            key={index}
-                            className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))
                       ) : (
-                        <span className="px-3 py-1 bg-orange-100 text-orange-600 text-sm rounded-full">
-                          Lottie
-                        </span>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-24 h-24 bg-orange-200 rounded-lg flex items-center justify-center">
+                            <span className="text-2xl">🎬</span>
+                          </div>
+                        </div>
                       )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     </div>
-                  </div>
-                </Link>
-              ))
+                    <div className="p-6">
+                      <div className="text-sm text-orange-600 font-medium mb-2">{template.category}</div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">{template.title}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {template.tags && template.tags.length > 0 ? (
+                          template.tags.slice(0, 3).map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="px-3 py-1 bg-orange-100 text-orange-600 text-sm rounded-full">
+                            Lottie
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })
             )}
           </div>
 

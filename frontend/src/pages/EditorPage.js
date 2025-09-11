@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
+import LottieRenderer from '../components/editor/LottieRenderer';
+import LottieRenderer from '../components/editor/LottieRenderer';
 
 const EditorPage = () => {
   const { templateId } = useParams();
@@ -10,6 +12,7 @@ const EditorPage = () => {
   const [currentState, setCurrentState] = useState({});
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1.0);
+  const [canvasSize, setCanvasSize] = useState({ width: 400, height: 400 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -76,6 +79,156 @@ const EditorPage = () => {
     }
   };
 
+  const setBySelector = (obj, selector, value) => {
+    // Supports selectors like: layers[0].t.d.k[0].s.t
+    try {
+      const tokens = selector.replace(/\]/g, '').split(/\.|\[/).filter(Boolean);
+      let cursor = obj;
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const key = isNaN(+tokens[i]) ? tokens[i] : +tokens[i];
+        if (cursor[key] === undefined) return false;
+        cursor = cursor[key];
+      }
+      const last = tokens[tokens.length - 1];
+      const lastKey = isNaN(+last) ? last : +last;
+      cursor[lastKey] = value;
+      return true;
+    } catch (e) {
+      console.warn('setBySelector failed', selector, e);
+      return false;
+    }
+  };
+
+  const hexToRgbaArray = (hex) => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!m) return [1, 1, 1, 1];
+    const r = parseInt(m[1], 16) / 255;
+    const g = parseInt(m[2], 16) / 255;
+    const b = parseInt(m[3], 16) / 255;
+    return [r, g, b, 1];
+  };
+
+  const applyPatchesToAnimation = (patches, manifest, anim) => {
+    if (!patches || patches.length === 0 || !anim) return anim;
+    const updated = JSON.parse(JSON.stringify(anim));
+
+    for (const patch of patches) {
+      const { op, path, value } = patch;
+      if (op !== 'replace') continue;
+
+      // Speed
+      if (path === '/speed') {
+        setSpeed(typeof value === 'number' ? value : 1.0);
+        continue;
+      }
+
+      // Text
+      if (path.startsWith('/text/')) {
+        const id = path.split('/')[2];
+        const t = (manifest?.text || []).find(x => x.id === id);
+        if (t?.selector) setBySelector(updated, t.selector, value);
+        continue;
+      }
+
+      // Colors
+      if (path.startsWith('/colors/')) {
+        const id = path.split('/')[2];
+        const c = (manifest?.colors || []).find(x => x.id === id);
+        if (c?.selector) setBySelector(updated, c.selector, hexToRgbaArray(value));
+        continue;
+      }
+
+      // Images
+      if (path.startsWith('/images/')) {
+        const id = path.split('/')[2];
+        const img = (manifest?.images || []).find(x => x.id === id);
+        const assetId = img?.asset_id;
+        if (assetId && Array.isArray(updated.assets)) {
+          const asset = updated.assets.find(a => a.id === assetId);
+          if (asset) {
+            asset.u = '';
+            asset.p = value;
+          }
+        }
+        continue;
+      }
+
+      // Font family
+      if (path === '/font/family') {
+        const family = String(value || '').trim();
+        if (updated.fonts?.list && Array.isArray(updated.fonts.list)) {
+          if (!updated.fonts.list.find(f => f.fFamily === family || f.fName === family)) {
+            updated.fonts.list.push({ fName: family, fFamily: family, fStyle: 'Regular', ascent: 75 });
+          }
+        }
+        (manifest?.text || []).forEach(t => {
+          const sel = t.selector?.replace(/\.t$/, '.f');
+          if (sel) setBySelector(updated, sel, family);
+        });
+        continue;
+      }
+
+      // Font size
+      if (path === '/font/size') {
+        const size = Number(value) || 24;
+        (manifest?.text || []).forEach(t => {
+          const sel = t.selector?.replace(/\.t$/, '.s.s');
+          if (sel) setBySelector(updated, sel, size);
+        });
+        continue;
+      }
+
+      // Canvas aspect ratio handled in caller by setCanvasSize
+      if (path === '/canvas/aspect') {
+        const preset = (value || '').toString().toLowerCase();
+        if (preset.includes('16:9') || preset.includes('youtube') || preset.includes('widescreen')) {
+          setCanvasSize({ width: 1280, height: 720 });
+        } else if (preset.includes('9:16') || preset.includes('vertical') || preset.includes('tiktok') || preset.includes('story') || preset.includes('reel')) {
+          setCanvasSize({ width: 720, height: 1280 });
+        } else if (preset.includes('1:1') || preset.includes('square') || preset.includes('instagram post')) {
+          setCanvasSize({ width: 1080, height: 1080 });
+        }
+        continue;
+      }
+
+      // Transforms
+      if (path === '/transform/op' && value && typeof value === 'object') {
+        const { type, factor, degrees, dx, dy, targetLabel } = value;
+        // Affect matching text layers by label; fallback to first text layer
+        const targets = (manifest?.text || []).filter(t => !targetLabel || (t.label || '').toLowerCase().includes(targetLabel));
+        const targetList = targets.length > 0 ? targets : (manifest?.text || []).slice(0, 1);
+        targetList.forEach(t => {
+          // Map text selector to the layer index to modify transform keys
+          const m = /layers\[(\d+)\]/.exec(t.selector || '');
+          if (!m) return;
+          const li = parseInt(m[1], 10);
+          const layer = updated.layers?.[li];
+          if (!layer) return;
+          const ks = layer.ks || (layer.ks = {});
+          // Position
+          if (type === 'translate' && (dx || dy)) {
+            const p = ks.p || (ks.p = { a: 0, k: [layer.ks?.p?.k?.[0] || 0, layer.ks?.p?.k?.[1] || 0, 0] });
+            const k = Array.isArray(p.k) ? p.k : [0, 0, 0];
+            p.k = [k[0] + (dx || 0), k[1] + (dy || 0), 0];
+          }
+          // Scale (percentage)
+          if (type === 'scale' && factor) {
+            const s = ks.s || (ks.s = { a: 0, k: [100, 100, 100] });
+            s.k = [Math.round(s.k[0] * factor), Math.round(s.k[1] * factor), 100];
+          }
+          // Rotation
+          if (type === 'rotate' && typeof degrees === 'number') {
+            const r = ks.r || (ks.r = { a: 0, k: 0 });
+            r.k = (r.k || 0) + degrees;
+          }
+        });
+        continue;
+      }
+    }
+
+    return updated;
+  };
+
   const handlePrompt = async () => {
     if (!promptText.trim()) return;
 
@@ -91,18 +244,17 @@ const EditorPage = () => {
       // Apply patches from AI response
       if (response.patches && response.patches.length > 0) {
         const newState = { ...currentState };
-        
         response.patches.forEach(patch => {
           if (patch.op === 'replace') {
-            // Apply patch to state
             const pathParts = patch.path.split('/').filter(p => p);
-            if (pathParts.length > 0) {
-              newState[pathParts.join('.')] = patch.value;
-            }
+            if (pathParts.length > 0) newState[pathParts.join('.')] = patch.value;
           }
         });
-        
         setCurrentState(newState);
+
+        // Apply directly to animation JSON
+        const updatedAnim = applyPatchesToAnimation(response.patches, template?.manifest || {}, animationData);
+        if (updatedAnim) setAnimationData(updatedAnim);
         
         // Clear prompt
         setPromptText('');
@@ -243,20 +395,16 @@ const EditorPage = () => {
           
           {/* Player Area */}
           <div className="flex-1 flex items-center justify-center p-8 bg-gray-100">
-            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden" style={{width: '400px', height: '400px'}}>
+            <div className="relative bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center" style={{width: `${canvasSize.width}px`, height: `${canvasSize.height}px`}}>
               {animationData ? (
-                <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">🎬</div>
-                    <div className="text-sm text-gray-600">Lottie Animation Loaded</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {animationData.w}x{animationData.h} • {animationData.fr}fps
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {animationData.layers?.length || 0} layers
-                    </div>
-                  </div>
-                </div>
+                <LottieRenderer
+                  animationData={animationData}
+                  isPlaying={isPlaying}
+                  speed={speed}
+                  loop={true}
+                  autoplay={true}
+                  className="w-full h-full"
+                />
               ) : (
                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                   <div className="text-gray-500">No animation loaded</div>

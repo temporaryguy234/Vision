@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Link, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { apiService } from '../services/api';
+import { renderLottiePreview } from '../components/editor/LottieRenderer';
 
 const UploadPage = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -92,6 +93,28 @@ const UploadPage = () => {
     formData.append('source', source);
     
     const result = await apiService.uploadTemplate(formData);
+
+    // Generate previews client-side: last-frame PNG + 2.5s WebM
+    try {
+      const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      // Fetch animation data to render locally
+      const animData = await apiService.getTemplateData(result.id);
+      const { webmBlob, pngBlob } = await renderLottiePreview({
+        animationData: animData,
+        width: 400,
+        height: 400,
+        durationSeconds: 2.5,
+        fps: 30
+      });
+
+      await apiService.uploadTemplatePreviews(result.id, {
+        imageFile: new File([pngBlob], `${result.id}_thumb.png`, { type: 'image/png' }),
+        videoFile: new File([webmBlob], `${result.id}_preview.webm`, { type: 'video/webm' })
+      });
+    } catch (e) {
+      console.warn('Preview generation failed (continuing without):', e);
+    }
+
     return {
       id: result.id,
       name: result.name,

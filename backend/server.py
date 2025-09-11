@@ -13,10 +13,12 @@ import logging
 from pathlib import Path
 import aiofiles
 import hashlib
+from datetime import datetime
 
 # Import our models and processors
 from models import *
 from lottie_processor import lottie_processor
+from file_storage import FileStorageManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,15 +28,157 @@ logger = logging.getLogger(__name__)
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 DB_NAME = "motionedit"
 
+class FileCursor:
+    def __init__(self, items):
+        self._items = items
+        self._skip = 0
+        self._limit = None
+        self._sort = None
+
+    def skip(self, n: int):
+        self._skip = n
+        return self
+
+    def limit(self, n: int):
+        self._limit = n
+        return self
+
+    def sort(self, key: str, direction: int):
+        reverse = direction < 0
+        self._sort = (key, reverse)
+        return self
+
+    async def to_list(self, length=None):
+        items = list(self._items)
+        if self._sort:
+            key, reverse = self._sort
+            items.sort(key=lambda x: x.get(key), reverse=reverse)
+        if self._skip:
+            items = items[self._skip :]
+        if self._limit is not None:
+            items = items[: self._limit]
+        return items
+
+
+class FileCollection:
+    def __init__(self, file_path: Path):
+        self.file_path = file_path
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.file_path.exists():
+            self._write_sync([])
+
+    async def insert_one(self, doc: Dict[str, Any]):
+        docs = await self._read()
+        docs.append(doc)
+        await self._write(docs)
+        return {"inserted_id": doc.get("id")}
+
+    def find(self, filter_query: Dict[str, Any]):
+        # Simple filtering supporting equality only
+        docs = self._read_sync()
+        def match(d):
+            for k, v in filter_query.items():
+                if d.get(k) != v:
+                    return False
+            return True
+        matched = [d for d in docs if match(d)] if filter_query else docs
+        return FileCursor(matched)
+
+    async def find_one(self, filter_query: Dict[str, Any]):
+        cursor = self.find(filter_query)
+        items = await cursor.to_list()
+        return items[0] if items else None
+
+    async def update_one(self, filter_query: Dict[str, Any], update: Dict[str, Any]):
+        docs = await self._read()
+        matched = 0
+        for i, d in enumerate(docs):
+            ok = True
+            for k, v in filter_query.items():
+                if d.get(k) != v:
+                    ok = False
+                    break
+            if ok:
+                set_data = update.get("$set", {})
+                d.update(set_data)
+                docs[i] = d
+                matched = 1
+                break
+        if matched:
+            await self._write(docs)
+        return type("Res", (), {"matched_count": matched})
+
+    async def delete_many(self, filter_query: Dict[str, Any]):
+        docs = await self._read()
+        if not filter_query:
+            deleted = len(docs)
+            docs = []
+        else:
+            before = len(docs)
+            def match(d):
+                for k, v in filter_query.items():
+                    if d.get(k) != v:
+                        return False
+                return True
+            docs = [d for d in docs if not match(d)]
+            deleted = before - len(docs)
+        await self._write(docs)
+        return {"deleted_count": deleted}
+
+    async def count_documents(self, filter_query: Dict[str, Any]):
+        return len(await self.find(filter_query).to_list())
+
+    async def _read(self):
+        async with aiofiles.open(self.file_path, "r", encoding="utf-8") as f:
+            content = await f.read()
+            return json.loads(content or "[]")
+
+    def _read_sync(self):
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                return json.loads(f.read() or "[]")
+        except FileNotFoundError:
+            return []
+
+    async def _write(self, docs: List[Dict[str, Any]]):
+        async with aiofiles.open(self.file_path, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(docs, indent=2))
+
+    def _write_sync(self, docs: List[Dict[str, Any]]):
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(docs, indent=2))
+
+
+class FileDB:
+    def __init__(self, base_dir: Path):
+        db_dir = base_dir / "db"
+        self.templates = FileCollection(db_dir / "templates.json")
+        self.template_revisions = FileCollection(db_dir / "template_revisions.json")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    app.mongodb_client = AsyncIOMotorClient(MONGO_URL)
-    app.mongodb = app.mongodb_client[DB_NAME]
-    logger.info("Connected to MongoDB")
+    # Startup: try Mongo, otherwise fallback to file DB
+    use_file_db = False
+    app.mongodb_client = None
+    app.mongodb = None
+    try:
+        app.mongodb_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=1000)
+        await app.mongodb_client.admin.command("ping")
+        app.mongodb = app.mongodb_client[DB_NAME]
+        logger.info("Connected to MongoDB")
+    except Exception as e:
+        logger.warning(f"MongoDB not available, using file DB. Reason: {e}")
+        use_file_db = True
+
+    # Expose unified db accessor
+    app.file_db = FileDB(Path(os.environ.get('UPLOADS_DIR', str(Path(__file__).parent.parent / 'uploads')))) if use_file_db else None
+
     yield
+
     # Shutdown
-    app.mongodb_client.close()
+    if app.mongodb_client:
+        app.mongodb_client.close()
 
 app = FastAPI(title="MotionEdit API", lifespan=lifespan)
 
@@ -47,9 +191,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create uploads directory
-UPLOADS_DIR = Path("/app/uploads")
-UPLOADS_DIR.mkdir(exist_ok=True)
+# Create uploads directory (configurable)
+UPLOADS_DIR = Path(os.environ.get('UPLOADS_DIR', str(Path(__file__).parent.parent / 'uploads')))
+UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
+(
+    UPLOADS_DIR / "previews"
+).mkdir(exist_ok=True, parents=True)
 
 # Mount static files
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
@@ -59,7 +206,10 @@ api_router = APIRouter(prefix="/api")
 
 # Database dependency
 def get_database():
-    return app.mongodb
+    # Prefer Mongo if available, otherwise file DB
+    return app.mongodb if getattr(app, 'mongodb', None) else app.file_db
+
+file_storage_manager = FileStorageManager(base_upload_dir=str(UPLOADS_DIR))
 
 # Template Upload and Processing
 @api_router.post("/templates/upload")
@@ -90,6 +240,7 @@ async def upload_template(
         
         # Generate preview (placeholder for now)
         preview_url = f"/uploads/previews/{unique_filename}.png"
+        preview_video_url = ""
         
         # Generate proper slug
         base_name = file.filename.replace('.json', '').replace('.lottie', '')
@@ -111,6 +262,7 @@ async def upload_template(
             # Add required fields for Template model compatibility
             "slug": safe_slug,
             "preview_image_url": preview_url,
+            "preview_video_url": preview_video_url,
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []
@@ -251,7 +403,11 @@ async def get_template_animation_data(template_id: str, db=Depends(get_database)
             raise HTTPException(status_code=404, detail="Template not found")
         
         # Read the animation file
-        file_path = Path("/app" + template["file_url"])
+        file_url: str = template.get("file_url", "")
+        if not file_url.startswith("/uploads/"):
+            raise HTTPException(status_code=404, detail="Invalid animation file path")
+        relative = file_url[len("/uploads/"):]
+        file_path = UPLOADS_DIR / relative
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Animation file not found")
         
@@ -262,6 +418,64 @@ async def get_template_animation_data(template_id: str, db=Depends(get_database)
         raise
     except Exception as e:
         logger.error(f"Get animation data error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Previews upload (client-side generated)
+@api_router.post("/templates/{template_id}/previews")
+async def upload_template_previews(
+    template_id: str,
+    image: Optional[UploadFile] = File(None),
+    video: Optional[UploadFile] = File(None),
+    db=Depends(get_database)
+):
+    try:
+        # Verify template exists
+        template = await db.templates.find_one({"id": template_id})
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+        preview_image_url = template.get("preview_image_url", "")
+        preview_video_url = template.get("preview_video_url", "")
+
+        # Save image
+        if image is not None:
+            # Force into previews subdir
+            previews_dir = UPLOADS_DIR / "previews"
+            previews_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{template_id}_thumb.png"
+            file_path = previews_dir / filename
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await image.read()
+                await f.write(content)
+            preview_image_url = f"/uploads/previews/{filename}"
+
+        # Save video
+        if video is not None:
+            previews_dir = UPLOADS_DIR / "previews"
+            previews_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{template_id}_preview.webm"
+            file_path = previews_dir / filename
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await video.read()
+                await f.write(content)
+            preview_video_url = f"/uploads/previews/{filename}"
+
+        # Update template
+        update_data = {
+            "preview_image_url": preview_image_url,
+            "preview_video_url": preview_video_url,
+            "updated_at": datetime.utcnow()
+        }
+        await db.templates.update_one({"id": template_id}, {"$set": update_data})
+
+        return {
+            "preview_image_url": preview_image_url,
+            "preview_video_url": preview_video_url
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Upload previews error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Template Revisions
@@ -339,45 +553,187 @@ async def process_prompt(
         raise HTTPException(status_code=500, detail=str(e))
 
 async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Dict]:
-    """Process AI prompt and return JSON patches (placeholder implementation)"""
-    patches = []
-    
-    # Simple pattern matching for demo
-    prompt_lower = prompt.lower()
-    
-    # Speed changes
-    if "faster" in prompt_lower or "speed" in prompt_lower:
-        if "30%" in prompt_lower or "faster" in prompt_lower:
-            patches.append({
-                "op": "replace",
-                "path": "/speed",
-                "value": 1.3
-            })
-    
-    # Text changes
-    if "title" in prompt_lower and "hello world" in prompt_lower:
-        text_elements = manifest.get("text", [])
-        if text_elements:
-            patches.append({
-                "op": "replace", 
-                "path": f"/text/{text_elements[0]['id']}",
-                "value": "Hello World"
-            })
-    
-    # Color changes
-    if "primary color" in prompt_lower and "#" in prompt:
-        color_match = None
-        import re
-        hex_match = re.search(r'#[0-9a-fA-F]{6}', prompt)
-        if hex_match:
-            color_elements = manifest.get("colors", [])
-            if color_elements:
-                patches.append({
-                    "op": "replace",
-                    "path": f"/colors/{color_elements[0]['id']}",
-                    "value": hex_match.group()
-                })
-    
+    """Process AI prompt and return JSON patches (enhanced rules)."""
+    import re
+
+    patches: List[Dict[str, Any]] = []
+    text_elements = manifest.get("text", []) or []
+    color_elements = manifest.get("colors", []) or []
+    image_elements = manifest.get("images", []) or []
+    chart_elements = manifest.get("chart", []) or []
+
+    prompt_norm = prompt.strip()
+    prompt_lower = prompt_norm.lower()
+
+    # Helpers
+    def find_by_label(items, label_query):
+        for it in items:
+            if label_query in it.get("label", "").lower():
+                return it
+        return None
+
+    def parse_percent(val: str) -> Optional[float]:
+        m = re.search(r'(\-?\d+(?:\.\d+)?)\s*%?', val)
+        if not m:
+            return None
+        return float(m.group(1))
+
+    def parse_color_hex(s: str) -> Optional[str]:
+        m = re.search(r'#[0-9a-fA-F]{6}', s)
+        if m:
+            return m.group(0)
+        # basic named colors
+        named = {
+            'red': '#ff0000','green':'#00ff00','blue':'#0000ff','black':'#000000','white':'#ffffff',
+            'orange':'#ffa500','purple':'#800080','yellow':'#ffff00','pink':'#ffc0cb','gray':'#808080'
+        }
+        for name, hx in named.items():
+            if name in s.lower():
+                return hx
+        return None
+
+    # Helpers to find element IDs by label
+    def find_text_id_by_label(label: str) -> Optional[str]:
+        for it in text_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
+    def find_color_id_by_label(label: str) -> Optional[str]:
+        for it in color_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
+    def find_image_id_by_label(label: str) -> Optional[str]:
+        for it in image_elements:
+            if label in it.get('label', '').lower():
+                return it.get('id')
+        return None
+
+    # 1) Speed changes: "make it 30% faster", "reduce speed by 20%", "speed 1.5x"
+    if any(k in prompt_lower for k in ["faster", "slower", "speed", "playback"]):
+        # explicit factor like 1.5x
+        m = re.search(r'(\d+(?:\.\d+)?)\s*x', prompt_lower)
+        if m:
+            factor = float(m.group(1))
+            patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, factor))})
+        else:
+            # percent faster/slower
+            m = re.search(r'(increase|boost|faster|raise|decrease|reduce|slower|lower)[^\d%]*(\d+(?:\.\d+)?)\s*%', prompt_lower)
+            if m:
+                amt = float(m.group(2)) / 100.0
+                factor = 1.0 + amt if m.group(1) in ["increase","boost","faster","raise"] else 1.0 - amt
+                patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, round(factor, 2)))})
+            else:
+                # default faster/slower without amount
+                if "faster" in prompt_lower or "increase" in prompt_lower or "raise" in prompt_lower:
+                    patches.append({"op":"replace","path":"/speed","value": 1.2})
+                elif "slower" in prompt_lower or "reduce" in prompt_lower or "lower" in prompt_lower:
+                    patches.append({"op":"replace","path":"/speed","value": 0.8})
+
+    # 2) Text changes: global or targeted ("change title to ...")
+    m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+"([^"]+)"', prompt_norm, flags=re.I)
+    if not m:
+        m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+([^\n]+)$', prompt_norm, flags=re.I)
+    if m and text_elements:
+        label = m.group(1).lower()
+        value = (m.group(2) or "").strip()
+        target = find_by_label(text_elements, label) or (text_elements[0] if text_elements else None)
+        if target:
+            patches.append({"op":"replace","path":f"/text/{target['id']}","value":value})
+
+    # 3) Color changes: "set {label} color to #ff6a00" or "make stroke blue"
+    color_hex = parse_color_hex(prompt_norm)
+    if color_hex and color_elements:
+        target = None
+        # target by explicit '{label} color'
+        m = re.search(r'(title|headline|stroke|fill|background|primary|secondary|text|logo)[^\n]*color', prompt_lower)
+        if m:
+            target = find_by_label(color_elements, m.group(1))
+        if not target:
+            for token in ["primary","secondary","stroke","fill","background","chart","title","text"]:
+                if token in prompt_lower:
+                    target = find_by_label(color_elements, token)
+                    if target:
+                        break
+        if not target and color_elements:
+            target = color_elements[0]
+        if target:
+            patches.append({"op":"replace","path":f"/colors/{target['id']}","value":color_hex})
+
+    # 4) Image swap: "change logo to https://...png"
+    m = re.search(r'(logo|image|picture|photo|icon)[^\S\n]*to\s+(https?://\S+)', prompt_norm, flags=re.I)
+    if m and image_elements:
+        label = m.group(1).lower()
+        url = m.group(2)
+        target = find_by_label(image_elements, label) or image_elements[0]
+        patches.append({"op":"replace","path":f"/images/{target['id']}","value":url})
+
+    # 5) Chart edits: "set values to [10,20,30]" or "increase bar 3 by 20%"
+    if chart_elements:
+        m = re.search(r'(?:set|values|data)[^\[]*\[(.*?)\]', prompt_norm, flags=re.I)
+        if m:
+            try:
+                arr = [float(x.strip()) for x in m.group(1).split(',')]
+                patches.append({"op":"replace","path":"/chart/data","value":arr})
+            except Exception:
+                pass
+        else:
+            m = re.search(r'(?:increase|decrease)\s+bar\s+(\d+)\s+by\s+(\d+(?:\.\d+)?)\s*%', prompt_lower)
+            if m:
+                idx = int(m.group(1)) - 1
+                amt = float(m.group(2)) / 100.0
+                patches.append({"op":"replace","path":"/chart/op","value":{"type":"delta_percent","index":idx,"amount":amt}})
+
+    # 6) Canvas aspect ratio presets
+    if any(k in prompt_lower for k in ["16:9","9:16","1:1","youtube","instagram","tiktok","vertical","square","widescreen","story","reel"]):
+        if any(k in prompt_lower for k in ["16:9","youtube","widescreen"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"16:9"})
+        elif any(k in prompt_lower for k in ["9:16","vertical","tiktok","story","reel"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"9:16"})
+        elif any(k in prompt_lower for k in ["1:1","square","instagram post"]):
+            patches.append({"op":"replace","path":"/canvas/aspect","value":"1:1"})
+
+    # 7) Transform/motion: scale, rotate, move (with optional target label)
+    # Scale
+    m = re.search(r'(?:scale|make)\s+(?:(\w+)\s+)?(bigger|smaller|by\s+\d+(?:\.\d+)?%|\d+(?:\.\d+)?x)', prompt_lower)
+    if m:
+        target_label = m.group(1)
+        token = m.group(2)
+        factor = 1.0
+        pm = re.search(r'(\d+(?:\.\d+)?)\s*x', token)
+        if pm:
+            factor = float(pm.group(1))
+        else:
+            pm = re.search(r'(\d+(?:\.\d+)?)\s*%', token)
+            if pm:
+                factor = 1.0 + float(pm.group(1))/100.0
+            elif 'bigger' in token:
+                factor = 1.2
+            elif 'smaller' in token:
+                factor = 0.8
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"scale","factor": round(factor, 2), "targetLabel": target_label}})
+
+    # Rotate
+    m = re.search(r'rotate\s+(?:(\w+)\s+)?(\-?\d+(?:\.\d+)?)\s*(deg|degree|degrees)?', prompt_lower)
+    if m:
+        target_label = m.group(1)
+        deg = float(m.group(2))
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"rotate","degrees": deg, "targetLabel": target_label}})
+
+    # Move
+    m = re.search(r'move\s+(?:(\w+)\s+)?(left|right|up|down)\s+(\d+(?:\.\d+)?)\s*(px|pixels)?', prompt_lower)
+    if m:
+        target_label = m.group(1)
+        dir = m.group(2)
+        amt = float(m.group(3))
+        dx = (-amt if dir=="left" else amt if dir=="right" else 0)
+        dy = (-amt if dir=="up" else amt if dir=="down" else 0)
+        patches.append({"op":"replace","path":"/transform/op","value": {"type":"translate","dx": dx, "dy": dy, "targetLabel": target_label}})
+
+    return patches
+
 # Include router
 app.include_router(api_router)
 

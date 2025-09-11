@@ -10,7 +10,8 @@ const LottieRenderer = ({
   isPlaying,
   onClick,
   onDragStart,
-  className = ""
+  className = "",
+  animationData: externalAnimationData
 }) => {
   const lottieRef = useRef(null);
 
@@ -38,8 +39,18 @@ const LottieRenderer = ({
   const [error, setError] = React.useState(null);
 
   useEffect(() => {
+    const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+    // If external data is provided, use it directly
+    if (externalAnimationData) {
+      setAnimationData(externalAnimationData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     if (!sourceUrl) {
-      setError('No source URL provided');
+      setError('No source provided');
       setLoading(false);
       return;
     }
@@ -48,26 +59,24 @@ const LottieRenderer = ({
       try {
         setLoading(true);
         setError(null);
-        
+
         let data;
-        
-        // Handle embedded animations via API
+
         if (sourceUrl.startsWith('embedded://')) {
           const animationId = sourceUrl.replace('embedded://', '');
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/lottiefiles/animation/${animationId}/data`);
-          if (!response.ok) {
-            throw new Error(`Failed to load embedded animation: ${response.status}`);
-          }
+          const response = await fetch(`${backendBase}/api/lottiefiles/animation/${animationId}/data`);
+          if (!response.ok) throw new Error(`Failed to load embedded animation: ${response.status}`);
+          data = await response.json();
+        } else if (sourceUrl.startsWith('/uploads/')) {
+          const response = await fetch(`${backendBase}${sourceUrl}`);
+          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
           data = await response.json();
         } else {
-          // Handle external URLs
           const response = await fetch(sourceUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to load animation: ${response.status}`);
-          }
+          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
           data = await response.json();
         }
-        
+
         setAnimationData(data);
       } catch (err) {
         console.error('Error loading Lottie animation:', err);
@@ -78,7 +87,7 @@ const LottieRenderer = ({
     };
 
     loadAnimation();
-  }, [sourceUrl]);
+  }, [sourceUrl, externalAnimationData]);
 
   if (loading) {
     return (
@@ -114,7 +123,7 @@ const LottieRenderer = ({
       className={`inline-block ${className} ${isSelected ? 'ring-2 ring-orange-500 rounded' : ''}`}
       onClick={onClick}
       onMouseDown={onDragStart}
-      style={{ width: '96px', height: '96px' }} // Fixed size for now
+      style={{ width: '96px', height: '96px' }}
     >
       <Lottie
         lottieRef={lottieRef}
@@ -134,3 +143,59 @@ const LottieRenderer = ({
 };
 
 export default LottieRenderer;
+
+// --- Preview helpers ---
+export async function renderLottiePreview({ animationData, width = 400, height = 400, durationSeconds = 2.5, fps = 30 }) {
+  // Render frames to canvas and return a WebM Blob and a PNG Blob of the last frame
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Use an offscreen <lottie-player> via lottie-web if needed; here we draw frames by time using Lottie's API via lottie-web
+  // lottie-react does not expose frame-stepping; for recording we dynamically import lottie-web
+  const lottieWeb = await import('lottie-web');
+  const container = document.createElement('div');
+  const anim = lottieWeb.loadAnimation({
+    container,
+    renderer: 'canvas',
+    loop: false,
+    autoplay: false,
+    animationData
+  });
+
+  await new Promise((resolve) => {
+    anim.addEventListener('DOMLoaded', () => resolve());
+  });
+
+  const totalFrames = Math.min(Math.floor(durationSeconds * fps), Math.floor(anim.getDuration(true)));
+
+  const stream = canvas.captureStream(fps);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((resolve) => recorder.onstop = resolve);
+  recorder.start();
+
+  // Draw frames
+  for (let i = 0; i < totalFrames; i++) {
+    anim.goToAndStop(i, true);
+    // Draw the animation's canvas onto our canvas
+    const sourceCanvas = container.querySelector('canvas');
+    if (sourceCanvas) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(sourceCanvas, 0, 0, width, height);
+    }
+    await new Promise(r => setTimeout(r, 1000 / fps));
+  }
+
+  recorder.stop();
+  await stopped;
+
+  const webmBlob = new Blob(chunks, { type: 'video/webm' });
+  const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+  anim.destroy();
+
+  return { webmBlob, pngBlob };
+}
