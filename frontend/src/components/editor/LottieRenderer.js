@@ -123,7 +123,7 @@ const LottieRenderer = ({
       className={`inline-block ${className} ${isSelected ? 'ring-2 ring-orange-500 rounded' : ''}`}
       onClick={onClick}
       onMouseDown={onDragStart}
-      style={{ width: '96px', height: '96px' }} // Fixed size for now
+      style={{ width: '96px', height: '96px' }}
     >
       <Lottie
         lottieRef={lottieRef}
@@ -143,3 +143,59 @@ const LottieRenderer = ({
 };
 
 export default LottieRenderer;
+
+// --- Preview helpers ---
+export async function renderLottiePreview({ animationData, width = 400, height = 400, durationSeconds = 2.5, fps = 30 }) {
+  // Render frames to canvas and return a WebM Blob and a PNG Blob of the last frame
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Use an offscreen <lottie-player> via lottie-web if needed; here we draw frames by time using Lottie's API via lottie-web
+  // lottie-react does not expose frame-stepping; for recording we dynamically import lottie-web
+  const lottieWeb = await import('lottie-web');
+  const container = document.createElement('div');
+  const anim = lottieWeb.loadAnimation({
+    container,
+    renderer: 'canvas',
+    loop: false,
+    autoplay: false,
+    animationData
+  });
+
+  await new Promise((resolve) => {
+    anim.addEventListener('DOMLoaded', () => resolve());
+  });
+
+  const totalFrames = Math.min(Math.floor(durationSeconds * fps), Math.floor(anim.getDuration(true)));
+
+  const stream = canvas.captureStream(fps);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((resolve) => recorder.onstop = resolve);
+  recorder.start();
+
+  // Draw frames
+  for (let i = 0; i < totalFrames; i++) {
+    anim.goToAndStop(i, true);
+    // Draw the animation's canvas onto our canvas
+    const sourceCanvas = container.querySelector('canvas');
+    if (sourceCanvas) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(sourceCanvas, 0, 0, width, height);
+    }
+    await new Promise(r => setTimeout(r, 1000 / fps));
+  }
+
+  recorder.stop();
+  await stopped;
+
+  const webmBlob = new Blob(chunks, { type: 'video/webm' });
+  const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+  anim.destroy();
+
+  return { webmBlob, pngBlob };
+}
