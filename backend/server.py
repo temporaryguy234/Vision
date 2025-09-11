@@ -207,6 +207,7 @@ async def import_from_url(
 @api_router.get("/templates")
 async def get_templates(
     category: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     db=Depends(get_database)
@@ -216,7 +217,14 @@ async def get_templates(
         filter_query = {}
         if category:
             filter_query["category"] = category
-        
+
+        if search:
+            # Case-insensitive search on title and tags
+            filter_query["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"tags": {"$regex": search, "$options": "i"}},
+            ]
+
         cursor = db.templates.find(filter_query).skip(skip).limit(limit)
         templates = await cursor.to_list(length=None)
         

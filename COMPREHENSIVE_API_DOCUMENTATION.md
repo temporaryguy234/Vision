@@ -160,7 +160,7 @@ Get templates with filtering and sorting.
 
 **Query Parameters:**
 - `category`: Filter by template category
-- `search`: Text search in title/tags
+- `search`: Case-insensitive search on template titles and tags
 - `tags`: Comma-separated tag filter
 - `creator_id`: Filter by creator
 - `is_public`: Public/private filter
