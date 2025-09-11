@@ -236,6 +236,7 @@ async def upload_template(
         
         # Generate preview (placeholder for now)
         preview_url = f"/uploads/previews/{unique_filename}.png"
+        preview_video_url = ""
         
         # Generate proper slug
         base_name = file.filename.replace('.json', '').replace('.lottie', '')
@@ -257,6 +258,7 @@ async def upload_template(
             # Add required fields for Template model compatibility
             "slug": safe_slug,
             "preview_image_url": preview_url,
+            "preview_video_url": preview_video_url,
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []

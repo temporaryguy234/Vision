@@ -200,6 +200,7 @@ class Template(BaseModel):
     category: TemplateCategory
     tags: List[str] = Field(default=[])
     preview_image_url: str = Field(description="URL to preview image")
+    preview_video_url: Optional[str] = Field(default="", description="URL to preview video (webm/mp4)")
     supported_aspect_ratios: List[AspectRatio] = Field(default=[AspectRatio.WIDESCREEN])
     editable_parameters_schema: EditableParametersSchema
     creator_id: str = Field(description="ID of the template creator")

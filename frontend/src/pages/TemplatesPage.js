@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Grid, List } from 'lucide-react';
 import { apiService } from '../services/api';
+import LottieRenderer from '../components/editor/LottieRenderer';
 
 const TemplatesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,13 +138,28 @@ const TemplatesPage = () => {
                 to={`/t/${template.id}`}
                 className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-105 template-card"
               >
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  <img
-                    src={template.preview_image_url || template.preview_url || ''}
-                    alt={template.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden flex items-center justify-center">
+                  {template.preview_image_url || template.preview_url ? (
+                    <img
+                      src={template.preview_image_url || template.preview_url || ''}
+                      alt={template.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : template.file_url ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <LottieRenderer
+                        sourceUrl={template.file_url}
+                        isPlaying={true}
+                        autoplay={true}
+                        loop={true}
+                        speed={1.0}
+                        className="w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">No preview</div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-4 left-4 text-white">
                       {template.duration && (

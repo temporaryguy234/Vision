@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { apiService } from './services/api';
+import LottieRenderer from './components/editor/LottieRenderer';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
@@ -266,6 +267,17 @@ const HomePage = () => {
                         alt={template.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       />
+                    ) : template.file_url ? (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <LottieRenderer
+                          sourceUrl={template.file_url}
+                          isPlaying={true}
+                          autoplay={true}
+                          loop={true}
+                          speed={1.0}
+                          className="w-full h-full"
+                        />
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <div className="w-24 h-24 bg-orange-200 rounded-lg flex items-center justify-center">

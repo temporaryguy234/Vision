@@ -400,6 +400,9 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
+            # For Lottie JSON, return a neutral placeholder to avoid broken UI
+            if asset_type == AssetType.LOTTIE_JSON:
+                return "/uploads/thumbnails/lottie_placeholder.svg"
             # For other types, we might return a default thumbnail or None
             return None
             
