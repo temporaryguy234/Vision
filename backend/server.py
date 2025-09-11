@@ -13,10 +13,13 @@ import logging
 from pathlib import Path
 import aiofiles
 import hashlib
+from datetime import datetime
 
 # Import our models and processors
 from models import *
 from lottie_processor import lottie_processor
+from preview_generator import generate_preview
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -87,8 +90,10 @@ async def upload_template(
         
         # Process file
         animation_data, manifest = await lottie_processor.process_file(file_path)
-        
-        # Generate preview (placeholder for now)
+
+        # Generate preview image
+        preview_path = UPLOADS_DIR / "previews" / f"{unique_filename}.png"
+        generate_preview(file_path, preview_path)
         preview_url = f"/uploads/previews/{unique_filename}.png"
         
         # Generate proper slug
@@ -157,7 +162,9 @@ async def import_from_url(
         async with aiofiles.open(file_path, 'w') as f:
             await f.write(json.dumps(animation_data, indent=2))
         
-        # Generate preview
+        # Generate preview image
+        preview_path = UPLOADS_DIR / "previews" / f"{unique_filename}.png"
+        generate_preview(file_path, preview_path)
         preview_url = f"/uploads/previews/{unique_filename}.png"
         
         # Generate proper slug
@@ -250,6 +257,39 @@ async def get_template(template_id: str, db=Depends(get_database)):
         logger.error(f"Get template error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.patch("/templates/{template_id}")
+async def update_template(template_id: str, update: TemplateUpdate, db=Depends(get_database)):
+    """Update fields on a template"""
+    try:
+        update_data = update.model_dump(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No update data provided")
+        update_data["updated_at"] = datetime.utcnow()
+        result = await db.templates.update_one({"id": template_id}, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Template not found")
+        template = await db.templates.find_one({"id": template_id})
+        return Template(**template)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update template error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/templates/{template_id}")
+async def delete_template(template_id: str, db=Depends(get_database)):
+    """Delete a template"""
+    try:
+        result = await db.templates.delete_one({"id": template_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete template error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/templates/{template_id}/data")
 async def get_template_animation_data(template_id: str, db=Depends(get_database)):
     """Get the original animation data for a template"""
@@ -316,76 +356,41 @@ async def get_revisions(
     except Exception as e:
         logger.error(f"Get revisions error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 # AI Prompt Processing
+class PromptRequest(BaseModel):
+    prompt: str
+
+def _parse_prompt(prompt: str) -> Dict[str, str]:
+    """Very small parser that maps 'key: value' pairs from a prompt."""
+    updates: Dict[str, str] = {}
+    for part in prompt.split(";"):
+        if ":" in part:
+            key, value = part.split(":", 1)
+            key = key.strip().lower()
+            value = value.strip()
+            if key in {"title", "description"}:
+                updates[key] = value
+    return updates
+
 @api_router.post("/templates/{template_id}/prompt")
-async def process_prompt(
-    template_id: str,
-    prompt_data: Dict[str, Any],
-    db=Depends(get_database)
-):
-    """Process natural language prompt and return JSON patches"""
+async def process_prompt(template_id: str, request: PromptRequest, db=Depends(get_database)):
+    """Apply simple prompt-based updates to a template."""
     try:
-        # Get template
         template = await db.templates.find_one({"id": template_id})
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
-        
-        prompt = prompt_data.get("prompt", "")
-        current_state = prompt_data.get("state", {})
-        manifest = template.get("manifest", {})
-        
-        # Process with AI (placeholder - would integrate with LLM)
-        patches = await process_ai_prompt(prompt, manifest, current_state)
-        
-        return {"patches": patches}
-        
+        updates = _parse_prompt(request.prompt)
+        if updates:
+            updates["updated_at"] = datetime.utcnow()
+            await db.templates.update_one({"id": template_id}, {"$set": updates})
+            template.update(updates)
+        return {"updated_fields": list(updates.keys()), "template": Template(**template)}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Process prompt error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Dict]:
-    """Process AI prompt and return JSON patches (placeholder implementation)"""
-    patches = []
-    
-    # Simple pattern matching for demo
-    prompt_lower = prompt.lower()
-    
-    # Speed changes
-    if "faster" in prompt_lower or "speed" in prompt_lower:
-        if "30%" in prompt_lower or "faster" in prompt_lower:
-            patches.append({
-                "op": "replace",
-                "path": "/speed",
-                "value": 1.3
-            })
-    
-    # Text changes
-    if "title" in prompt_lower and "hello world" in prompt_lower:
-        text_elements = manifest.get("text", [])
-        if text_elements:
-            patches.append({
-                "op": "replace", 
-                "path": f"/text/{text_elements[0]['id']}",
-                "value": "Hello World"
-            })
-    
-    # Color changes
-    if "primary color" in prompt_lower and "#" in prompt:
-        color_match = None
-        import re
-        hex_match = re.search(r'#[0-9a-fA-F]{6}', prompt)
-        if hex_match:
-            color_elements = manifest.get("colors", [])
-            if color_elements:
-                patches.append({
-                    "op": "replace",
-                    "path": f"/colors/{color_elements[0]['id']}",
-                    "value": hex_match.group()
-                })
-    
 # Include router
 app.include_router(api_router)
 
