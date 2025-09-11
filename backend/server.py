@@ -17,6 +17,7 @@ import hashlib
 # Import our models and processors
 from models import *
 from lottie_processor import lottie_processor
+from file_storage import FileStorageManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -206,6 +207,8 @@ api_router = APIRouter(prefix="/api")
 def get_database():
     # Prefer Mongo if available, otherwise file DB
     return app.mongodb if getattr(app, 'mongodb', None) else app.file_db
+
+file_storage_manager = FileStorageManager(base_upload_dir=str(UPLOADS_DIR))
 
 # Template Upload and Processing
 @api_router.post("/templates/upload")
@@ -414,6 +417,64 @@ async def get_template_animation_data(template_id: str, db=Depends(get_database)
         raise
     except Exception as e:
         logger.error(f"Get animation data error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Previews upload (client-side generated)
+@api_router.post("/templates/{template_id}/previews")
+async def upload_template_previews(
+    template_id: str,
+    image: Optional[UploadFile] = File(None),
+    video: Optional[UploadFile] = File(None),
+    db=Depends(get_database)
+):
+    try:
+        # Verify template exists
+        template = await db.templates.find_one({"id": template_id})
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+        preview_image_url = template.get("preview_image_url", "")
+        preview_video_url = template.get("preview_video_url", "")
+
+        # Save image
+        if image is not None:
+            # Force into previews subdir
+            previews_dir = UPLOADS_DIR / "previews"
+            previews_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{template_id}_thumb.png"
+            file_path = previews_dir / filename
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await image.read()
+                await f.write(content)
+            preview_image_url = f"/uploads/previews/{filename}"
+
+        # Save video
+        if video is not None:
+            previews_dir = UPLOADS_DIR / "previews"
+            previews_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{template_id}_preview.webm"
+            file_path = previews_dir / filename
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await video.read()
+                await f.write(content)
+            preview_video_url = f"/uploads/previews/{filename}"
+
+        # Update template
+        update_data = {
+            "preview_image_url": preview_image_url,
+            "preview_video_url": preview_video_url,
+            "updated_at": datetime.utcnow()
+        }
+        await db.templates.update_one({"id": template_id}, {"$set": update_data})
+
+        return {
+            "preview_image_url": preview_image_url,
+            "preview_video_url": preview_video_url
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Upload previews error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Template Revisions
