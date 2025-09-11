@@ -553,45 +553,117 @@ async def process_prompt(
         raise HTTPException(status_code=500, detail=str(e))
 
 async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Dict]:
-    """Process AI prompt and return JSON patches (placeholder implementation)"""
-    patches = []
-    
-    # Simple pattern matching for demo
-    prompt_lower = prompt.lower()
-    
-    # Speed changes
-    if "faster" in prompt_lower or "speed" in prompt_lower:
-        if "30%" in prompt_lower or "faster" in prompt_lower:
-            patches.append({
-                "op": "replace",
-                "path": "/speed",
-                "value": 1.3
-            })
-    
-    # Text changes
-    if "title" in prompt_lower and "hello world" in prompt_lower:
-        text_elements = manifest.get("text", [])
-        if text_elements:
-            patches.append({
-                "op": "replace", 
-                "path": f"/text/{text_elements[0]['id']}",
-                "value": "Hello World"
-            })
-    
-    # Color changes
-    if "primary color" in prompt_lower and "#" in prompt:
-        color_match = None
-        import re
-        hex_match = re.search(r'#[0-9a-fA-F]{6}', prompt)
-        if hex_match:
-            color_elements = manifest.get("colors", [])
-            if color_elements:
-                patches.append({
-                    "op": "replace",
-                    "path": f"/colors/{color_elements[0]['id']}",
-                    "value": hex_match.group()
-                })
-    
+    """Process AI prompt and return JSON patches (enhanced rules)."""
+    import re
+
+    patches: List[Dict[str, Any]] = []
+    text_elements = manifest.get("text", []) or []
+    color_elements = manifest.get("colors", []) or []
+    image_elements = manifest.get("images", []) or []
+    chart_elements = manifest.get("chart", []) or []
+
+    prompt_norm = prompt.strip()
+    prompt_lower = prompt_norm.lower()
+
+    # Helpers
+    def find_by_label(items, label_query):
+        for it in items:
+            if label_query in it.get("label", "").lower():
+                return it
+        return None
+
+    def parse_percent(val: str) -> Optional[float]:
+        m = re.search(r'(\-?\d+(?:\.\d+)?)\s*%?', val)
+        if not m:
+            return None
+        return float(m.group(1))
+
+    def parse_color_hex(s: str) -> Optional[str]:
+        m = re.search(r'#[0-9a-fA-F]{6}', s)
+        if m:
+            return m.group(0)
+        # basic named colors
+        named = {
+            'red': '#ff0000','green':'#00ff00','blue':'#0000ff','black':'#000000','white':'#ffffff',
+            'orange':'#ffa500','purple':'#800080','yellow':'#ffff00','pink':'#ffc0cb','gray':'#808080'
+        }
+        for name, hx in named.items():
+            if name in s.lower():
+                return hx
+        return None
+
+    # 1) Speed changes: "make it 30% faster", "reduce speed by 20%", "speed 1.5x"
+    if any(k in prompt_lower for k in ["faster", "slower", "speed", "playback"]):
+        # explicit factor like 1.5x
+        m = re.search(r'(\d+(?:\.\d+)?)\s*x', prompt_lower)
+        if m:
+            factor = float(m.group(1))
+            patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, factor))})
+        else:
+            # percent faster/slower
+            m = re.search(r'(increase|boost|faster|raise|decrease|reduce|slower|lower)[^\d%]*(\d+(?:\.\d+)?)\s*%', prompt_lower)
+            if m:
+                amt = float(m.group(2)) / 100.0
+                factor = 1.0 + amt if m.group(1) in ["increase","boost","faster","raise"] else 1.0 - amt
+                patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, round(factor, 2)))})
+            else:
+                # default faster/slower without amount
+                if "faster" in prompt_lower or "increase" in prompt_lower or "raise" in prompt_lower:
+                    patches.append({"op":"replace","path":"/speed","value": 1.2})
+                elif "slower" in prompt_lower or "reduce" in prompt_lower or "lower" in prompt_lower:
+                    patches.append({"op":"replace","path":"/speed","value": 0.8})
+
+    # 2) Text changes: "change title to Hello World", "set headline to \"Sale\""
+    m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+"([^"]+)"', prompt_norm, flags=re.I)
+    if not m:
+        m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+([^\n]+)$', prompt_norm, flags=re.I)
+    if m and text_elements:
+        label = m.group(1).lower()
+        value = (m.group(2) or "").strip()
+        target = find_by_label(text_elements, label) or (text_elements[0] if text_elements else None)
+        if target:
+            patches.append({"op":"replace","path":f"/text/{target['id']}","value":value})
+
+    # 3) Color changes: "set primary color to #ff6a00", "make chart bar color blue"
+    color_hex = parse_color_hex(prompt_norm)
+    if color_hex and color_elements:
+        # Try to match by label keyword before defaulting to first
+        target = None
+        for token in ["primary","secondary","stroke","fill","background","chart","title","text"]:
+            if token in prompt_lower:
+                target = find_by_label(color_elements, token)
+                if target:
+                    break
+        if not target:
+            target = color_elements[0]
+        patches.append({"op":"replace","path":f"/colors/{target['id']}","value":color_hex})
+
+    # 4) Image swap: "change logo to https://...png"
+    m = re.search(r'(logo|image|picture|photo|icon)[^\S\n]*to\s+(https?://\S+)', prompt_norm, flags=re.I)
+    if m and image_elements:
+        label = m.group(1).lower()
+        url = m.group(2)
+        target = find_by_label(image_elements, label) or image_elements[0]
+        patches.append({"op":"replace","path":f"/images/{target['id']}","value":url})
+
+    # 5) Chart edits: "set values to [10,20,30]" or "increase bar 3 by 20%"
+    if chart_elements:
+        m = re.search(r'(?:set|values|data)[^\[]*\[(.*?)\]', prompt_norm, flags=re.I)
+        if m:
+            try:
+                arr = [float(x.strip()) for x in m.group(1).split(',')]
+                patches.append({"op":"replace","path":"/chart/data","value":arr})
+            except Exception:
+                pass
+        else:
+            m = re.search(r'(?:increase|decrease)\s+bar\s+(\d+)\s+by\s+(\d+(?:\.\d+)?)\s*%', prompt_lower)
+            if m:
+                idx = int(m.group(1)) - 1
+                amt = float(m.group(2)) / 100.0
+                patches.append({"op":"replace","path":"/chart/op","value":{"type":"delta_percent","index":idx,"amount":amt}})
+
+    return patches
+
 # Include router
 app.include_router(api_router)
 
