@@ -15,6 +15,11 @@ import {
 
 import { apiService } from './services/api';
 import LottieRenderer from './components/editor/LottieRenderer';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginModal from './components/auth/LoginModal';
+import RegisterModal from './components/auth/RegisterModal';
+import SubscriptionModal from './components/subscription/SubscriptionModal';
+import SubscriptionBanner from './components/subscription/SubscriptionBanner';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
@@ -28,6 +33,8 @@ import BrandKitsPage from './pages/BrandKitsPage';
 // Navigation Component
 const Sidebar = () => {
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const [showSubscription, setShowSubscription] = useState(false);
   
   const navigation = [
     { name: 'Explore', href: '/', icon: Home },
@@ -128,13 +135,29 @@ const TopBar = () => {
 
 // Main Layout Component
 const Layout = ({ children }) => {
+  const { user } = useAuth();
+  const [showSubscription, setShowSubscription] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {!bannerDismissed && (
+        <SubscriptionBanner
+          onUpgrade={() => setShowSubscription(true)}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
+      
       <Sidebar />
       <TopBar />
-      <main className="pl-64 pt-16">
+      <main className={`pl-64 ${!bannerDismissed && user?.subscription_tier === 'free' && user?.credits_remaining <= 1 ? 'pt-32' : 'pt-16'}`}>
         {children}
       </main>
+      
+      <SubscriptionModal
+        isOpen={showSubscription}
+        onClose={() => setShowSubscription(false)}
+      />
     </div>
   );
 };

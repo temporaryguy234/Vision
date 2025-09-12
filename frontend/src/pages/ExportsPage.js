@@ -1,73 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Calendar, FileVideo, Image, File, Eye, Trash2, RefreshCw } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
 
 const ExportsPage = () => {
   const [activeTab, setActiveTab] = useState('history');
+  const [exports, setExports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const { user } = useAuth();
 
-  const exports = [
-    {
-      id: 1,
-      projectName: 'Summer Campaign Video',
-      format: 'MP4',
-      resolution: '1080p',
-      size: '45.2 MB',
-      duration: '15s',
-      status: 'Completed',
-      exportedAt: '2024-01-15 14:30',
-      downloadUrl: '#'
-    },
-    {
-      id: 2,
-      projectName: 'Q4 Sales Report',
-      format: 'WebM',
-      resolution: '4K',
-      size: '128.7 MB',
-      duration: '30s',
-      status: 'Completed',
-      exportedAt: '2024-01-14 09:15',
-      downloadUrl: '#'
-    },
-    {
-      id: 3,
-      projectName: 'Brand Logo Animation',
-      format: 'GIF',
-      resolution: '720p',
-      size: '12.4 MB',
-      duration: '8s',
-      status: 'Processing',
-      exportedAt: '2024-01-13 16:45',
-      downloadUrl: null
-    },
-    {
-      id: 4,
-      projectName: 'Product Launch Teaser',
-      format: 'Lottie JSON',
-      resolution: 'Vector',
-      size: '2.1 MB',
-      duration: '12s',
-      status: 'Completed',
-      exportedAt: '2024-01-12 11:20',
-      downloadUrl: '#'
-    },
-    {
-      id: 5,
-      projectName: 'Motivational Quote Card',
-      format: 'MP4',
-      resolution: '1080p Vertical',
-      size: '18.9 MB',
-      duration: '6s',
-      status: 'Failed',
-      exportedAt: '2024-01-11 13:05',
-      downloadUrl: null,
-      error: 'Insufficient storage space'
+  useEffect(() => {
+    loadExports();
+  }, []);
+
+  const loadExports = async () => {
+    try {
+      const exportsData = await apiService.getUserExports();
+      setExports(exportsData);
+    } catch (error) {
+      console.error('Failed to load exports:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const handleDeleteExport = async (exportId) => {
+    if (!confirm('Are you sure you want to delete this export?')) return;
+    
+    try {
+      await apiService.deleteExport(exportId);
+      setExports(exports.filter(exp => exp.id !== exportId));
+    } catch (error) {
+      alert('Failed to delete export');
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return 'N/A';
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'Completed':
+      case 'completed':
         return 'bg-green-100 text-green-600';
       case 'Processing':
+      case 'rendering':
         return 'bg-blue-100 text-blue-600';
       case 'Failed':
         return 'bg-red-100 text-red-600';
@@ -124,86 +116,102 @@ const ExportsPage = () => {
         </div>
 
         {activeTab === 'history' && (
-          <div className="space-y-4">
-            {exports.map((exportItem) => {
-              const FormatIcon = getFormatIcon(exportItem.format);
-              
-              return (
-                <div
-                  key={exportItem.id}
-                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-gradient-to-r from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
-                          <FormatIcon className="w-6 h-6 text-orange-600" />
+          loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            </div>
+          ) : exports.length === 0 ? (
+            <div className="text-center py-12">
+              <Download className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No exports yet</h3>
+              <p className="text-gray-600">Start creating and exporting your motion graphics</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {exports.map((exportItem) => {
+                const FormatIcon = getFormatIcon(exportItem.format);
+                
+                return (
+                  <div
+                    key={exportItem.id}
+                    className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-12 h-12 bg-gradient-to-r from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
+                            <FormatIcon className="w-6 h-6 text-orange-600" />
+                          </div>
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {exportItem.template_id || 'Animation Export'}
+                          </h3>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                            <span>{exportItem.format}</span>
+                            <span>•</span>
+                            <span>{exportItem.resolution}</span>
+                            <span>•</span>
+                            <span>{formatFileSize(exportItem.file_size)}</span>
+                            {exportItem.has_watermark && (
+                              <>
+                                <span>•</span>
+                                <span className="text-orange-600">Watermarked</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-500">
+                              {formatDate(exportItem.created_at)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">{exportItem.projectName}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span>{exportItem.format}</span>
-                          <span>•</span>
-                          <span>{exportItem.resolution}</span>
-                          <span>•</span>
-                          <span>{exportItem.size}</span>
-                          <span>•</span>
-                          <span>{exportItem.duration}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-500">{exportItem.exportedAt}</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center space-x-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(exportItem.status)}`}>
-                        {exportItem.status}
-                      </span>
-                      
-                      <div className="flex items-center space-x-2">
-                        {exportItem.status === 'Completed' && exportItem.downloadUrl && (
-                          <>
-                            <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(exportItem.status)}`}>
+                          {exportItem.status}
+                        </span>
+                        
+                        <div className="flex items-center space-x-2">
+                          {exportItem.status === 'completed' && exportItem.download_url && (
+                            <a
+                              href={exportItem.download_url}
+                              download
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
                               <Download className="w-4 h-4" />
+                            </a>
+                          )}
+                          
+                          {exportItem.status === 'rendering' && (
+                            <button className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+                              <RefreshCw className="w-4 h-4 animate-spin" />
                             </button>
-                          </>
-                        )}
-                        
-                        {exportItem.status === 'Processing' && (
-                          <button className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
-                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          )}
+                          
+                          <button 
+                            onClick={() => handleDeleteExport(exportItem.id)}
+                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
-                        
-                        {exportItem.status === 'Failed' && (
-                          <button className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors">
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        <button className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        </div>
                       </div>
                     </div>
+                    
+                    {exportItem.error_message && (
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-600">Error: {exportItem.error_message}</p>
+                      </div>
+                    )}
                   </div>
-                  
-                  {exportItem.error && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-600">Error: {exportItem.error}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )
         )}
 
         {activeTab === 'formats' && (
@@ -337,24 +345,31 @@ const ExportsPage = () => {
         )}
 
         {/* Storage Info */}
-        <div className="mt-8 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200/50 rounded-xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Storage Usage</h3>
-              <p className="text-gray-600">Exports are stored for 30 days before automatic deletion</p>
+        {user && (
+          <div className="mt-8 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200/50 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Current Plan</h3>
+                <p className="text-gray-600">Exports are stored for 30 days before automatic deletion</p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-gray-900 capitalize">{user.subscription_tier}</div>
+                <div className="text-sm text-gray-600">{user.credits_remaining} credits left</div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">2.4 GB</div>
-              <div className="text-sm text-gray-600">of 10 GB used</div>
+            
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-300" 
+                  style={{ 
+                    width: `${Math.max(10, (user.credits_remaining / (user.subscription_tier === 'free' ? 5 : user.subscription_tier === 'mid' ? 50 : 100)) * 100)}%` 
+                  }}
+                ></div>
+              </div>
             </div>
           </div>
-          
-          <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full" style={{ width: '24%' }}></div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
