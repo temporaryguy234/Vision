@@ -4,6 +4,48 @@ from enum import Enum
 from datetime import datetime
 import uuid
 
+# User and Authentication Models
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str = Field(description="User email address")
+    full_name: str = Field(description="User's full name")
+    password_hash: Optional[str] = Field(description="Hashed password")
+    google_id: Optional[str] = Field(description="Google OAuth ID")
+    subscription_tier: str = Field(default="free", description="Subscription tier")
+    credits_remaining: int = Field(default=5, description="Export credits remaining")
+    subscription_expires: Optional[datetime] = Field(description="Subscription expiration date")
+    stripe_customer_id: Optional[str] = Field(description="Stripe customer ID")
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserSubscription(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = Field(description="User ID")
+    tier: str = Field(description="Subscription tier")
+    status: str = Field(description="Subscription status")
+    current_period_start: datetime
+    current_period_end: datetime
+    credits_remaining: int
+    auto_renew: bool = Field(default=True)
+    payment_method: Optional[str] = Field(description="Payment method used")
+    stripe_subscription_id: Optional[str] = Field(description="Stripe subscription ID")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Payment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = Field(description="User ID")
+    amount: float = Field(description="Payment amount")
+    currency: str = Field(default="USD")
+    subscription_tier: str = Field(description="Target subscription tier")
+    status: str = Field(description="Payment status")
+    payment_method: str = Field(description="Payment method")
+    stripe_payment_intent_id: Optional[str] = Field(description="Stripe payment intent ID")
+    paypal_payment_id: Optional[str] = Field(description="PayPal payment ID")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(description="Payment completion time")
+
 # Enums for consistent data types
 class TemplateCategory(str, Enum):
     INTROS_OUTROS = "Intros & Outros"
@@ -274,7 +316,7 @@ class BrandKit(BaseModel):
 class Export(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str = Field(description="ID of the export owner")
-    project_id: str = Field(description="Reference to source project")
+    template_id: str = Field(description="Reference to source template")
     format: ExportFormat
     resolution: ExportResolution
     aspect_ratio: AspectRatio
@@ -282,10 +324,12 @@ class Export(BaseModel):
     custom_height: Optional[int] = Field(ge=100, le=4000, description="Custom height for custom resolution")
     fps: int = Field(default=30, ge=1, le=120, description="Frames per second")
     transparent_background: bool = Field(default=False, description="Enable transparent background")
+    has_watermark: bool = Field(default=False, description="Whether export has watermark")
     status: ExportStatus = ExportStatus.QUEUED
     progress: int = Field(default=0, ge=0, le=100, description="Export progress percentage")
     download_url: Optional[str] = Field(description="URL to download the exported file")
     file_size: Optional[int] = Field(ge=0, description="Final file size in bytes")
+    file_path: Optional[str] = Field(description="Local file path")
     error_message: Optional[str] = Field(description="Error message if export failed")
     estimated_duration: Optional[int] = Field(ge=0, description="Estimated render time in seconds")
     actual_duration: Optional[int] = Field(ge=0, description="Actual render time in seconds")
@@ -362,7 +406,7 @@ class BrandKitUpdate(BaseModel):
     logo_urls: Optional[List[str]]
 
 class ExportCreate(BaseModel):
-    project_id: str
+    template_id: str
     user_id: str
     format: ExportFormat
     resolution: ExportResolution = ExportResolution.FULL_HD
@@ -371,6 +415,7 @@ class ExportCreate(BaseModel):
     custom_height: Optional[int] = Field(ge=100, le=4000)
     fps: int = Field(default=30, ge=1, le=120)
     transparent_background: bool = Field(default=False)
+    current_state: Dict[str, Any] = Field(default={}, description="Current editor state")
 
 # Revision System for Template Edits
 class TemplateRevision(BaseModel):

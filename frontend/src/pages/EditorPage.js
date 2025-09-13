@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap } from 'lucide-react';
+import { Play, Pause, RotateCcw, Save, Settings, Palette, Type, Image, Zap, Download, Crown } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import LottieRenderer from '../components/editor/LottieRenderer';
-import LottieRenderer from '../components/editor/LottieRenderer';
+import SubscriptionModal from '../components/subscription/SubscriptionModal';
+import ExportModal from '../components/editor/ExportModal';
 
 const EditorPage = () => {
   const { templateId } = useParams();
@@ -18,6 +20,11 @@ const EditorPage = () => {
   const [showDebug, setShowDebug] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [promptLoading, setPromptLoading] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  
+  const { user } = useAuth();
 
   // Load template data
   useEffect(() => {
@@ -43,7 +50,7 @@ const EditorPage = () => {
 
       // Load saved revisions
       try {
-        const revisions = await apiService.get(`/templates/${templateId}/revisions?user_id=current_user`);
+        const revisions = await apiService.getRevisions(templateId);
         if (revisions.length > 0) {
           setCurrentState(revisions[0].state);
         }
@@ -63,7 +70,6 @@ const EditorPage = () => {
     try {
       await apiService.post(`/templates/${templateId}/revisions`, {
         template_id: templateId,
-        user_id: 'current_user',
         state: currentState
       });
       
@@ -76,6 +82,46 @@ const EditorPage = () => {
     } catch (err) {
       console.error('Failed to save:', err);
       alert('Failed to save changes');
+    }
+  };
+
+  const handleExport = async (format, resolution) => {
+    if (!user) {
+      setShowSubscription(true);
+      return;
+    }
+
+    // Check if user has credits
+    if (user.credits_remaining <= 0) {
+      setShowSubscription(true);
+      return;
+    }
+
+    setExportLoading(true);
+    
+    try {
+      const result = await apiService.createExport(
+        templateId,
+        currentState,
+        format,
+        resolution
+      );
+      
+      // Show success and download link
+      alert(`Export successful! Download: ${result.download_url}`);
+      
+      // Refresh user data to update credits
+      window.location.reload();
+      
+    } catch (error) {
+      if (error.response?.status === 402) {
+        setShowSubscription(true);
+      } else {
+        alert('Export failed: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setExportLoading(false);
+      setShowExportModal(false);
     }
   };
 
@@ -369,6 +415,14 @@ const EditorPage = () => {
                 </button>
                 
                 <button
+                  onClick={() => setShowExportModal(true)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </button>
+                
+                <button
                   onClick={() => setShowDebug(!showDebug)}
                   className="p-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                 >
@@ -543,6 +597,19 @@ const EditorPage = () => {
         
       </div>
       
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+        loading={exportLoading}
+      />
+
+      <SubscriptionModal
+        isOpen={showSubscription}
+        onClose={() => setShowSubscription(false)}
+      />
+      
       {/* Debug Panel */}
       {showDebug && (
         <div className="fixed bottom-4 right-4 w-96 bg-white border border-gray-300 rounded-lg shadow-lg p-4 max-h-80 overflow-y-auto">
@@ -560,6 +627,11 @@ const EditorPage = () => {
             <div>
               <h4 className="font-medium text-gray-700">Template ID:</h4>
               <p className="text-gray-600 font-mono">{templateId}</p>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-gray-700">User:</h4>
+              <p className="text-gray-600">{user ? user.email : 'Not signed in'}</p>
             </div>
             
             <div>

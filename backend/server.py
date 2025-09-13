@@ -2,6 +2,8 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi import Request
+from fastapi.security import HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import errors as mongo_errors
 from contextlib import asynccontextmanager
@@ -19,6 +21,11 @@ from datetime import datetime
 from models import *
 from lottie_processor import lottie_processor
 from file_storage import FileStorageManager
+from auth import AuthService, get_current_user, get_current_user_optional, User, UserCreate, UserLogin, GoogleAuthRequest
+from subscription import SubscriptionService, SubscriptionTier
+from payments import PaymentService, PaymentIntent
+from ai_service import ai_service, AIPromptRequest
+from export_service import ExportService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -200,6 +207,7 @@ UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
 
 # Mount static files
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+app.mount("/exports", StaticFiles(directory="/app/exports"), name="exports")
 
 # API Router
 api_router = APIRouter(prefix="/api")
@@ -211,11 +219,162 @@ def get_database():
 
 file_storage_manager = FileStorageManager(base_upload_dir=str(UPLOADS_DIR))
 
+# Initialize services
+def get_auth_service(db=Depends(get_database)):
+    return AuthService(db)
+
+def get_subscription_service(db=Depends(get_database)):
+    return SubscriptionService(db)
+
+def get_payment_service(db=Depends(get_database)):
+    return PaymentService(db)
+
+def get_export_service(db=Depends(get_database)):
+    return ExportService(db, file_storage_manager)
+
+# Authentication Routes
+@api_router.post("/auth/register")
+async def register(
+    user_data: UserCreate,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Register a new user"""
+    user = await auth_service.register_user(user_data)
+    token = auth_service.create_access_token(user.id, user.email)
+    
+    return {
+        "user": user,
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+@api_router.post("/auth/login")
+async def login(
+    login_data: UserLogin,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Login user"""
+    user, token = await auth_service.authenticate_user(login_data)
+    
+    return {
+        "user": user,
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+@api_router.post("/auth/google")
+async def google_auth(
+    auth_request: GoogleAuthRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Authenticate with Google"""
+    user, token = await auth_service.google_auth(auth_request)
+    
+    return {
+        "user": user,
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+@api_router.get("/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information"""
+    return current_user
+
+# Subscription Routes
+@api_router.get("/subscriptions/plans")
+async def get_subscription_plans(
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """Get all subscription plans"""
+    return subscription_service.get_all_plans()
+
+@api_router.get("/subscriptions/current")
+async def get_current_subscription(
+    current_user: User = Depends(get_current_user),
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """Get user's current subscription"""
+    subscription = await subscription_service.get_user_subscription(current_user.id)
+    return {
+        "subscription": subscription,
+        "plan": subscription_service.get_plan(SubscriptionTier(current_user.subscription_tier))
+    }
+
+@api_router.post("/subscriptions/upgrade")
+async def upgrade_subscription(
+    tier: SubscriptionTier,
+    current_user: User = Depends(get_current_user),
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """Upgrade user subscription"""
+    subscription = await subscription_service.create_subscription(
+        current_user.id, 
+        tier
+    )
+    return subscription
+
+# Payment Routes
+@api_router.post("/payments/create-intent")
+async def create_payment_intent(
+    payment_data: PaymentIntent,
+    current_user: User = Depends(get_current_user),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Create payment intent"""
+    if payment_data.payment_method == "stripe":
+        result = await payment_service.create_stripe_payment_intent(
+            current_user.id,
+            payment_data.amount,
+            payment_data.subscription_tier
+        )
+    elif payment_data.payment_method == "paypal":
+        result = await payment_service.create_paypal_payment(
+            current_user.id,
+            payment_data.amount,
+            payment_data.subscription_tier
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid payment method")
+    
+    return result
+
+@api_router.post("/payments/stripe/webhook")
+async def stripe_webhook(
+    request: Request,
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Handle Stripe webhooks"""
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+    
+    success = await payment_service.handle_stripe_webhook(payload, sig_header)
+    
+    if success:
+        return {"status": "success"}
+    else:
+        raise HTTPException(status_code=400, detail="Webhook processing failed")
+
+@api_router.post("/payments/paypal/confirm")
+async def confirm_paypal_payment(
+    payment_id: str,
+    payer_id: str,
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Confirm PayPal payment"""
+    success = await payment_service.confirm_paypal_payment(payment_id, payer_id)
+    
+    if success:
+        return {"status": "success"}
+    else:
+        raise HTTPException(status_code=400, detail="Payment confirmation failed")
+
 # Template Upload and Processing
 @api_router.post("/templates/upload")
 async def upload_template(
     file: UploadFile = File(...),
     source: str = Form("upload"),
+    current_user: User = Depends(get_current_user),
     db=Depends(get_database)
 ):
     """Upload and process a Lottie template file"""
@@ -255,6 +414,7 @@ async def upload_template(
             "source": source,
             "license": "",
             "author": "",
+            "creator_id": current_user.id,
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
@@ -267,7 +427,6 @@ async def upload_template(
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []
             },
-            "creator_id": "system",
             "is_public": True
         }
         
@@ -289,6 +448,7 @@ async def upload_template(
 @api_router.post("/templates/import-url")
 async def import_from_url(
     url: str = Form(...),
+    current_user: User = Depends(get_current_user),
     db=Depends(get_database)
 ):
     """Import a Lottie template from URL"""
@@ -325,6 +485,7 @@ async def import_from_url(
             "source": "url",
             "license": "",
             "author": "",
+            "creator_id": current_user.id,
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
@@ -336,7 +497,6 @@ async def import_from_url(
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []
             },
-            "creator_id": "system",
             "is_public": True
         }
         
@@ -361,6 +521,7 @@ async def get_templates(
     category: Optional[str] = None,
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db=Depends(get_database)
 ):
     """Get templates with optional filtering"""
@@ -379,7 +540,11 @@ async def get_templates(
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/templates/{template_id}")
-async def get_template(template_id: str, db=Depends(get_database)):
+async def get_template(
+    template_id: str, 
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
+):
     """Get a specific template by ID"""
     try:
         template = await db.templates.find_one({"id": template_id})
@@ -395,7 +560,11 @@ async def get_template(template_id: str, db=Depends(get_database)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/templates/{template_id}/data")
-async def get_template_animation_data(template_id: str, db=Depends(get_database)):
+async def get_template_animation_data(
+    template_id: str, 
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
+):
     """Get the original animation data for a template"""
     try:
         template = await db.templates.find_one({"id": template_id})
@@ -483,6 +652,7 @@ async def upload_template_previews(
 async def save_revision(
     template_id: str,
     revision_data: TemplateRevisionCreate,
+    current_user: User = Depends(get_current_user),
     db=Depends(get_database)
 ):
     """Save a template edit revision"""
@@ -492,6 +662,8 @@ async def save_revision(
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
         
+        # Set user_id from current user
+        revision_data.user_id = current_user.id
         revision = TemplateRevision(**revision_data.model_dump())
         await db.template_revisions.insert_one(revision.model_dump())
         
@@ -506,14 +678,14 @@ async def save_revision(
 @api_router.get("/templates/{template_id}/revisions")
 async def get_revisions(
     template_id: str,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     db=Depends(get_database)
 ):
     """Get template revisions for a user"""
     try:
         cursor = db.template_revisions.find({
             "template_id": template_id,
-            "user_id": user_id
+            "user_id": current_user.id
         }).sort("created_at", -1).limit(10)
         
         revisions = await cursor.to_list(length=None)
@@ -528,6 +700,7 @@ async def get_revisions(
 async def process_prompt(
     template_id: str,
     prompt_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
     db=Depends(get_database)
 ):
     """Process natural language prompt and return JSON patches"""
@@ -541,10 +714,16 @@ async def process_prompt(
         current_state = prompt_data.get("state", {})
         manifest = template.get("manifest", {})
         
-        # Process with AI (placeholder - would integrate with LLM)
-        patches = await process_ai_prompt(prompt, manifest, current_state)
+        # Process with AI
+        ai_response = await ai_service.process_natural_language_prompt(
+            prompt, manifest, current_state
+        )
         
-        return {"patches": patches}
+        return {
+            "patches": ai_response.patches,
+            "explanation": ai_response.explanation,
+            "confidence": ai_response.confidence
+        }
         
     except HTTPException:
         raise
@@ -552,196 +731,184 @@ async def process_prompt(
         logger.error(f"Process prompt error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def process_ai_prompt(prompt: str, manifest: Dict, state: Dict) -> List[Dict]:
-    """Process AI prompt and return JSON patches (enhanced rules)."""
-    import re
+# Export Routes
+@api_router.post("/exports/create")
+async def create_export(
+    template_id: str,
+    current_state: Dict[str, Any],
+    export_format: str = "MP4",
+    resolution: str = "1080p",
+    current_user: User = Depends(get_current_user),
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Create export job"""
+    # Check subscription permissions
+    if not await subscription_service.check_export_permissions(current_user, resolution):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Your subscription doesn't support {resolution} exports"
+        )
+    
+    # Use credit
+    await subscription_service.use_credit(current_user.id)
+    
+    # Check if watermark should be added
+    add_watermark = subscription_service.should_add_watermark(current_user)
+    
+    # Create export
+    result = await export_service.export_animation(
+        current_user.id,
+        template_id,
+        current_state,
+        export_format,
+        resolution,
+        add_watermark
+    )
+    
+    return result
 
-    patches: List[Dict[str, Any]] = []
-    text_elements = manifest.get("text", []) or []
-    color_elements = manifest.get("colors", []) or []
-    image_elements = manifest.get("images", []) or []
-    chart_elements = manifest.get("chart", []) or []
+@api_router.get("/exports")
+async def get_user_exports(
+    current_user: User = Depends(get_current_user),
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Get user's exports"""
+    exports = await export_service.get_user_exports(current_user.id)
+    return exports
 
-    prompt_norm = prompt.strip()
-    prompt_lower = prompt_norm.lower()
-
-    # Helpers
-    def find_by_label(items, label_query):
-        for it in items:
-            if label_query in it.get("label", "").lower():
-                return it
-        return None
-
-    def parse_percent(val: str) -> Optional[float]:
-        m = re.search(r'(\-?\d+(?:\.\d+)?)\s*%?', val)
-        if not m:
-            return None
-        return float(m.group(1))
-
-    def parse_color_hex(s: str) -> Optional[str]:
-        m = re.search(r'#[0-9a-fA-F]{6}', s)
-        if m:
-            return m.group(0)
-        # basic named colors
-        named = {
-            'red': '#ff0000','green':'#00ff00','blue':'#0000ff','black':'#000000','white':'#ffffff',
-            'orange':'#ffa500','purple':'#800080','yellow':'#ffff00','pink':'#ffc0cb','gray':'#808080'
-        }
-        for name, hx in named.items():
-            if name in s.lower():
-                return hx
-        return None
-
-    # Helpers to find element IDs by label
-    def find_text_id_by_label(label: str) -> Optional[str]:
-        for it in text_elements:
-            if label in it.get('label', '').lower():
-                return it.get('id')
-        return None
-
-    def find_color_id_by_label(label: str) -> Optional[str]:
-        for it in color_elements:
-            if label in it.get('label', '').lower():
-                return it.get('id')
-        return None
-
-    def find_image_id_by_label(label: str) -> Optional[str]:
-        for it in image_elements:
-            if label in it.get('label', '').lower():
-                return it.get('id')
-        return None
-
-    # 1) Speed changes: "make it 30% faster", "reduce speed by 20%", "speed 1.5x"
-    if any(k in prompt_lower for k in ["faster", "slower", "speed", "playback"]):
-        # explicit factor like 1.5x
-        m = re.search(r'(\d+(?:\.\d+)?)\s*x', prompt_lower)
-        if m:
-            factor = float(m.group(1))
-            patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, factor))})
-        else:
-            # percent faster/slower
-            m = re.search(r'(increase|boost|faster|raise|decrease|reduce|slower|lower)[^\d%]*(\d+(?:\.\d+)?)\s*%', prompt_lower)
-            if m:
-                amt = float(m.group(2)) / 100.0
-                factor = 1.0 + amt if m.group(1) in ["increase","boost","faster","raise"] else 1.0 - amt
-                patches.append({"op":"replace","path":"/speed","value": max(0.2, min(3.0, round(factor, 2)))})
-            else:
-                # default faster/slower without amount
-                if "faster" in prompt_lower or "increase" in prompt_lower or "raise" in prompt_lower:
-                    patches.append({"op":"replace","path":"/speed","value": 1.2})
-                elif "slower" in prompt_lower or "reduce" in prompt_lower or "lower" in prompt_lower:
-                    patches.append({"op":"replace","path":"/speed","value": 0.8})
-
-    # 2) Text changes: global or targeted ("change title to ...")
-    m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+"([^"]+)"', prompt_norm, flags=re.I)
-    if not m:
-        m = re.search(r'(title|headline|text|label|caption|subtitle|name)\s+(?:to|=)\s+([^\n]+)$', prompt_norm, flags=re.I)
-    if m and text_elements:
-        label = m.group(1).lower()
-        value = (m.group(2) or "").strip()
-        target = find_by_label(text_elements, label) or (text_elements[0] if text_elements else None)
-        if target:
-            patches.append({"op":"replace","path":f"/text/{target['id']}","value":value})
-
-    # 3) Color changes: "set {label} color to #ff6a00" or "make stroke blue"
-    color_hex = parse_color_hex(prompt_norm)
-    if color_hex and color_elements:
-        target = None
-        # target by explicit '{label} color'
-        m = re.search(r'(title|headline|stroke|fill|background|primary|secondary|text|logo)[^\n]*color', prompt_lower)
-        if m:
-            target = find_by_label(color_elements, m.group(1))
-        if not target:
-            for token in ["primary","secondary","stroke","fill","background","chart","title","text"]:
-                if token in prompt_lower:
-                    target = find_by_label(color_elements, token)
-                    if target:
-                        break
-        if not target and color_elements:
-            target = color_elements[0]
-        if target:
-            patches.append({"op":"replace","path":f"/colors/{target['id']}","value":color_hex})
-
-    # 4) Image swap: "change logo to https://...png"
-    m = re.search(r'(logo|image|picture|photo|icon)[^\S\n]*to\s+(https?://\S+)', prompt_norm, flags=re.I)
-    if m and image_elements:
-        label = m.group(1).lower()
-        url = m.group(2)
-        target = find_by_label(image_elements, label) or image_elements[0]
-        patches.append({"op":"replace","path":f"/images/{target['id']}","value":url})
-
-    # 5) Chart edits: "set values to [10,20,30]" or "increase bar 3 by 20%"
-    if chart_elements:
-        m = re.search(r'(?:set|values|data)[^\[]*\[(.*?)\]', prompt_norm, flags=re.I)
-        if m:
-            try:
-                arr = [float(x.strip()) for x in m.group(1).split(',')]
-                patches.append({"op":"replace","path":"/chart/data","value":arr})
-            except Exception:
-                pass
-        else:
-            m = re.search(r'(?:increase|decrease)\s+bar\s+(\d+)\s+by\s+(\d+(?:\.\d+)?)\s*%', prompt_lower)
-            if m:
-                idx = int(m.group(1)) - 1
-                amt = float(m.group(2)) / 100.0
-                patches.append({"op":"replace","path":"/chart/op","value":{"type":"delta_percent","index":idx,"amount":amt}})
-
-    # 6) Canvas aspect ratio presets
-    if any(k in prompt_lower for k in ["16:9","9:16","1:1","youtube","instagram","tiktok","vertical","square","widescreen","story","reel"]):
-        if any(k in prompt_lower for k in ["16:9","youtube","widescreen"]):
-            patches.append({"op":"replace","path":"/canvas/aspect","value":"16:9"})
-        elif any(k in prompt_lower for k in ["9:16","vertical","tiktok","story","reel"]):
-            patches.append({"op":"replace","path":"/canvas/aspect","value":"9:16"})
-        elif any(k in prompt_lower for k in ["1:1","square","instagram post"]):
-            patches.append({"op":"replace","path":"/canvas/aspect","value":"1:1"})
-
-    # 7) Transform/motion: scale, rotate, move (with optional target label)
-    # Scale
-    m = re.search(r'(?:scale|make)\s+(?:(\w+)\s+)?(bigger|smaller|by\s+\d+(?:\.\d+)?%|\d+(?:\.\d+)?x)', prompt_lower)
-    if m:
-        target_label = m.group(1)
-        token = m.group(2)
-        factor = 1.0
-        pm = re.search(r'(\d+(?:\.\d+)?)\s*x', token)
-        if pm:
-            factor = float(pm.group(1))
-        else:
-            pm = re.search(r'(\d+(?:\.\d+)?)\s*%', token)
-            if pm:
-                factor = 1.0 + float(pm.group(1))/100.0
-            elif 'bigger' in token:
-                factor = 1.2
-            elif 'smaller' in token:
-                factor = 0.8
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"scale","factor": round(factor, 2), "targetLabel": target_label}})
-
-    # Rotate
-    m = re.search(r'rotate\s+(?:(\w+)\s+)?(\-?\d+(?:\.\d+)?)\s*(deg|degree|degrees)?', prompt_lower)
-    if m:
-        target_label = m.group(1)
-        deg = float(m.group(2))
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"rotate","degrees": deg, "targetLabel": target_label}})
-
-    # Move
-    m = re.search(r'move\s+(?:(\w+)\s+)?(left|right|up|down)\s+(\d+(?:\.\d+)?)\s*(px|pixels)?', prompt_lower)
-    if m:
-        target_label = m.group(1)
-        dir = m.group(2)
-        amt = float(m.group(3))
-        dx = (-amt if dir=="left" else amt if dir=="right" else 0)
-        dy = (-amt if dir=="up" else amt if dir=="down" else 0)
-        patches.append({"op":"replace","path":"/transform/op","value": {"type":"translate","dx": dx, "dy": dy, "targetLabel": target_label}})
-
-    return patches
+@api_router.delete("/exports/{export_id}")
+async def delete_export(
+    export_id: str,
+    current_user: User = Depends(get_current_user),
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Delete an export"""
+    success = await export_service.delete_export(export_id, current_user.id)
+    if success:
+        return {"message": "Export deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Export not found")
 
 # Include router
 app.include_router(api_router)
 
+# Bulk Import Routes (Enhanced)
+@api_router.post("/bulk-import/upload")
+async def bulk_import_upload(
+    files: List[UploadFile] = File(...),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Enhanced bulk upload with authentication"""
+    results = []
+    
+    for file in files:
+        try:
+            file_url, asset_type, metadata = await file_storage_manager.save_uploaded_file(file)
+            
+            # Check for duplicates using file hash
+            file_hash = metadata.get('file_hash')
+            if file_hash:
+                existing_template = await db.templates.find_one({"file_hash": file_hash})
+                if existing_template:
+                    results.append({
+                        "filename": file.filename,
+                        "status": "duplicate",
+                        "existing_template_id": existing_template['id'],
+                        "message": "File already exists in library"
+                    })
+                    continue
+            
+            # Generate thumbnail
+            thumbnail_url = await file_storage_manager.generate_thumbnail(file_url, asset_type)
+            
+            results.append({
+                "filename": file.filename,
+                "status": "success",
+                "file_url": file_url,
+                "asset_type": asset_type.value,
+                "metadata": metadata,
+                "thumbnail_url": thumbnail_url,
+                "file_hash": file_hash
+            })
+            
+        except Exception as e:
+            results.append({
+                "filename": file.filename,
+                "status": "error",
+                "message": str(e)
+            })
+    
+    return {"results": results}
 # Health check
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
+@api_router.post("/bulk-import/create-templates")
+async def bulk_import_create_templates(
+    import_data: Dict[str, Any],
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Create templates from bulk import data"""
+    items = import_data.get('items', [])
+    templates_created = []
+    errors = []
+    
+    for item in items:
+        try:
+            # Generate slug
+            title = item.get('title', item.get('filename', 'Untitled'))
+            slug = title.lower().replace(' ', '-').replace('_', '-')
+            slug = ''.join(c for c in slug if c.isalnum() or c == '-')
+            
+            # Create template
+            template_data = {
+                "title": title,
+                "slug": slug,
+                "category": item.get('category', 'Miscellaneous'),
+                "tags": item.get('tags', []),
+                "preview_image_url": item.get('thumbnail_url', ''),
+                "preview_video_url": "",
+                "file_url": item.get('file_url', ''),
+                "manifest": item.get('manifest', {}),
+                "creator_id": current_user.id if current_user else "anonymous",
+                "is_public": item.get('is_public', True),
+                "editable_parameters_schema": {
+                    "canvas": {
+                        "width": item.get('metadata', {}).get('width', 800),
+                        "height": item.get('metadata', {}).get('height', 600),
+                        "background_color": "#FFFFFF",
+                        "global_playback_speed": 1.0
+                    },
+                    "elements": []
+                }
+            }
+            
+            template = Template(**template_data)
+            await db.templates.insert_one(template.model_dump())
+            
+            templates_created.append({
+                "template_id": template.id,
+                "title": template.title,
+                "filename": item.get('filename')
+            })
+            
+        except Exception as e:
+            errors.append({
+                "filename": item.get('filename', 'unknown'),
+                "error": str(e)
+            })
+    
+    return {
+        "templates_created": templates_created,
+        "errors": errors,
+        "summary": {
+            "successful": len(templates_created),
+            "failed": len(errors),
+            "total": len(items)
+        }
+    }
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
