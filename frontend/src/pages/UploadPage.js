@@ -69,13 +69,20 @@ const UploadPage = () => {
 
   const handleUrlImport = async () => {
     if (!urlInput.trim()) return;
-    
+
     setIsProcessing(true);
     try {
       const result = await apiService.importFromUrl(urlInput);
       setUploadedFiles(prev => [...prev, result]);
       setUrlInput('');
     } catch (error) {
+      if (error.response?.status === 401) {
+        alert('Please log in to import templates.');
+        setIsProcessing(false);
+        const returnUrl = encodeURIComponent(window.location.pathname);
+        window.location.href = `/login?returnUrl=${returnUrl}`;
+        return;
+      }
       console.error('URL import error:', error);
       setUploadedFiles(prev => [...prev, {
         id: Date.now() + Math.random(),
