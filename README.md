@@ -6,7 +6,7 @@ When deploying the application, ensure that uploaded files are served directly b
 single-page application router. Static files live under the `/uploads/` path and should be mapped before the catch-all route
 used by the frontend.
 
-1. Build the frontend with the `REACT_APP_BACKEND_URL` environment variable pointing to the backend's public URL.
+1. API requests default to the same origin (`window.location.origin`). For cross-domain deployments, build the frontend with the `REACT_APP_BACKEND_URL` environment variable pointing to the backend's public URL (e.g., `REACT_APP_BACKEND_URL=https://api.example.com`).
 2. Configure your web server or reverse proxy to serve the `/uploads/` directory from the backend filesystem.
 
 Example **nginx** configuration:
