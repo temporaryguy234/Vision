@@ -39,8 +39,8 @@ const UploadPage = () => {
   const handleFiles = async (files) => {
     setIsProcessing(true);
     
-    const validFiles = files.filter(file => 
-      file.name.endsWith('.json') || file.name.endsWith('.lottie')
+    const validFiles = files.filter(file =>
+      file.name.toLowerCase().endsWith('.json') || file.name.toLowerCase().endsWith('.lottie')
     );
 
     if (validFiles.length === 0) {
