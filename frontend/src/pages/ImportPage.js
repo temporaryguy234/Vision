@@ -43,10 +43,10 @@ const ImportPage = () => {
       files.forEach(file => {
         formData.append('files', file);
       });
-      
+
       // Upload files
       const response = await apiService.bulkImportUpload(formData);
-      
+
       // Process results
       const processedFiles = response.results.map((result, index) => ({
         id: Date.now() + index,
@@ -71,6 +71,11 @@ const ImportPage = () => {
       }
       
     } catch (error) {
+      if (error.response?.status === 401) {
+        alert('Please log in to upload files.');
+        window.location.href = '/';
+        return;
+      }
       console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
     } finally {

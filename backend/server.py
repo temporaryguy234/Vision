@@ -374,11 +374,13 @@ async def confirm_paypal_payment(
 async def upload_template(
     file: UploadFile = File(...),
     source: str = Form("upload"),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db=Depends(get_database)
 ):
     """Upload and process a Lottie template file"""
     try:
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Authentication required to upload templates")
         # Validate file type
         if not (file.filename.endswith('.json') or file.filename.endswith('.lottie')):
             raise HTTPException(status_code=400, detail="Only .json and .lottie files are supported")
@@ -800,6 +802,8 @@ async def bulk_import_upload(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Enhanced bulk upload with authentication"""
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Authentication required to upload files")
     results = []
     
     for file in files:

@@ -91,8 +91,16 @@ const UploadPage = () => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('source', source);
-    
-    const result = await apiService.uploadTemplate(formData);
+    let result;
+    try {
+      result = await apiService.uploadTemplate(formData);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        alert('Please log in to upload templates.');
+        window.location.href = '/';
+      }
+      throw error;
+    }
 
     // Generate previews client-side: last-frame PNG + 2.5s WebM
     try {
