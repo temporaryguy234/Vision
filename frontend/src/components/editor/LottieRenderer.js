@@ -67,12 +67,13 @@ const LottieRenderer = ({
           const response = await fetch(`${backendBase}/api/lottiefiles/animation/${animationId}/data`);
           if (!response.ok) throw new Error(`Failed to load embedded animation: ${response.status}`);
           data = await response.json();
-        } else if (sourceUrl.startsWith('/uploads/')) {
-          const response = await fetch(`${backendBase}${sourceUrl}`);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
         } else {
-          const response = await fetch(sourceUrl);
+          let resolvedUrl = sourceUrl;
+          if (resolvedUrl.startsWith('/uploads/')) {
+            resolvedUrl = `${backendBase}${resolvedUrl}`;
+          }
+
+          const response = await fetch(resolvedUrl);
           if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
           data = await response.json();
         }
