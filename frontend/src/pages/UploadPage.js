@@ -76,14 +76,8 @@ const UploadPage = () => {
       setUploadedFiles(prev => [...prev, result]);
       setUrlInput('');
     } catch (error) {
-      if (error.response?.status === 401) {
-        alert('Please log in to import templates.');
-        setIsProcessing(false);
-        const returnUrl = encodeURIComponent(window.location.pathname);
-        window.location.href = `/login?returnUrl=${returnUrl}`;
-        return;
-      }
       console.error('URL import error:', error);
+      alert('Import failed. Please try again.');
       setUploadedFiles(prev => [...prev, {
         id: Date.now() + Math.random(),
         name: urlInput,
@@ -102,10 +96,7 @@ const UploadPage = () => {
     try {
       result = await apiService.uploadTemplate(formData);
     } catch (error) {
-      if (error.response?.status === 401) {
-        alert('Please log in to upload templates.');
-        window.location.href = '/';
-      }
+      alert('Upload failed. Please try again.');
       throw error;
     }
 
