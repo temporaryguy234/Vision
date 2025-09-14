@@ -451,7 +451,7 @@ async def upload_template(
 @api_router.post("/templates/import-url")
 async def import_from_url(
     url: str = Form(...),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db=Depends(get_database)
 ):
     """Import a Lottie template from URL"""
@@ -490,7 +490,7 @@ async def import_from_url(
             "source": "url",
             "license": "",
             "author": "",
-            "creator_id": current_user.id,
+            "creator_id": current_user.id if current_user else "anonymous",
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
