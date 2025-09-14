@@ -207,9 +207,35 @@ export const apiService = {
     return response.data;
   },
 
+  // LottieFiles curated endpoints
+  async searchLottieFilesAnimations({ query, category, limit = 20 } = {}) {
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    if (category) params.set('category', category);
+    if (limit) params.set('limit', String(limit));
+    const response = await api.get(`/lottiefiles/animations${params.toString() ? `?${params.toString()}` : ''}`);
+    return response.data;
+  },
+
+  async getLottieFilesCategories() {
+    const response = await api.get('/lottiefiles/categories');
+    return response.data;
+  },
+
+  async importLottieFilesAnimation(animationId) {
+    const response = await api.post(`/lottiefiles/animation/${animationId}/import`);
+    return response.data;
+  },
+
   // Projects
   async createProject(projectData) {
     const response = await api.post('/projects', projectData);
+    return response.data;
+  },
+
+  // Stats
+  async getStats() {
+    const response = await api.get('/stats');
     return response.data;
   },
 

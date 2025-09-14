@@ -39,7 +39,7 @@ const LottieRenderer = ({
   const [error, setError] = React.useState(null);
 
   useEffect(() => {
-    const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+    const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
     // If external data is provided, use it directly
     if (externalAnimationData) {
@@ -73,9 +73,28 @@ const LottieRenderer = ({
             resolvedUrl = `${backendBase}${resolvedUrl}`;
           }
 
-          const response = await fetch(resolvedUrl);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
+          const tryProxy = async () => {
+            const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
+            const proxyResp = await fetch(proxyUrl);
+            if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
+            return proxyResp.json();
+          };
+
+          try {
+            let response = await fetch(resolvedUrl);
+            if (!response.ok) {
+              data = await tryProxy();
+            } else {
+              try {
+                data = await response.json();
+              } catch (_) {
+                data = await tryProxy();
+              }
+            }
+          } catch (_) {
+            // Network/CORS error -> fall back to proxy
+            data = await tryProxy();
+          }
         }
 
         setAnimationData(data);

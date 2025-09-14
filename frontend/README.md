@@ -68,3 +68,19 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Deployment configuration
+
+Set the following environment variable for production deployments (including Emergent):
+
+- REACT_APP_BACKEND_URL: Absolute URL of your API server. If not set, the app will default to window.location.origin.
+
+Examples:
+
+```
+REACT_APP_BACKEND_URL=https://your-api.example.com
+```
+
+Notes:
+- Lottie animations referenced by external URLs may be blocked by the browser due to CORS. The app automatically falls back to a backend proxy at `/api/proxy/fetch-json` to fetch JSON animations safely.
+- Ensure your backend is accessible from the frontend origin and that `/uploads` is mounted by the API (default in `backend/server.py`).
