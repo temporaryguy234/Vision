@@ -465,13 +465,14 @@ async def import_from_url(
         filename = Path(parsed_url.path).name or "imported_animation.json"
         filename_lower = filename.lower()
         
-        # Save locally
-        file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+        # Save locally using a content hash to avoid name collisions
+        content = json.dumps(animation_data, sort_keys=True, indent=2)
+        file_hash = hashlib.md5(content.encode()).hexdigest()[:8]
         unique_filename = f"{file_hash}_{filename}"
         file_path = UPLOADS_DIR / unique_filename
-        
+
         async with aiofiles.open(file_path, 'w') as f:
-            await f.write(json.dumps(animation_data, indent=2))
+            await f.write(content)
         
         # Generate preview
         preview_url = f"/uploads/previews/{unique_filename}.png"
