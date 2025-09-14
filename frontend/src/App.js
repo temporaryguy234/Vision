@@ -20,6 +20,7 @@ import LoginModal from './components/auth/LoginModal';
 import RegisterModal from './components/auth/RegisterModal';
 import SubscriptionModal from './components/subscription/SubscriptionModal';
 import SubscriptionBanner from './components/subscription/SubscriptionBanner';
+import { useAuth } from './contexts/AuthContext';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
