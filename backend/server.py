@@ -379,8 +379,6 @@ async def upload_template(
 ):
     """Upload and process a Lottie template file"""
     try:
-        if current_user is None:
-            raise HTTPException(status_code=401, detail="Authentication required to upload templates")
         # Validate file type
         filename_lower = file.filename.lower()
         if not (filename_lower.endswith('.json') or filename_lower.endswith('.lottie')):
@@ -417,7 +415,7 @@ async def upload_template(
             "source": source,
             "license": "",
             "author": "",
-            "creator_id": current_user.id,
+            "creator_id": current_user.id if current_user else "anonymous",
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
