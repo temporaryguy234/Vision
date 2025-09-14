@@ -385,15 +385,15 @@ async def upload_template(
         if not (file.filename.endswith('.json') or file.filename.endswith('.lottie')):
             raise HTTPException(status_code=400, detail="Only .json and .lottie files are supported")
         
-        # Generate unique filename
-        file_hash = hashlib.md5(file.filename.encode()).hexdigest()[:8]
+        # Read file content and generate a unique filename based on its hash
+        content = await file.read()
+        file_hash = hashlib.md5(content).hexdigest()[:8]
         safe_name = "".join(c for c in file.filename if c.isalnum() or c in '.-_')
         unique_filename = f"{file_hash}_{safe_name}"
         file_path = UPLOADS_DIR / unique_filename
-        
+
         # Save file
         async with aiofiles.open(file_path, 'wb') as f:
-            content = await file.read()
             await f.write(content)
         
         # Process file
