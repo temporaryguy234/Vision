@@ -382,7 +382,8 @@ async def upload_template(
         if current_user is None:
             raise HTTPException(status_code=401, detail="Authentication required to upload templates")
         # Validate file type
-        if not (file.filename.endswith('.json') or file.filename.endswith('.lottie')):
+        filename_lower = file.filename.lower()
+        if not (filename_lower.endswith('.json') or filename_lower.endswith('.lottie')):
             raise HTTPException(status_code=400, detail="Only .json and .lottie files are supported")
         
         # Read file content and generate a unique filename based on its hash
@@ -404,7 +405,7 @@ async def upload_template(
         preview_video_url = ""
         
         # Generate proper slug
-        base_name = file.filename.replace('.json', '').replace('.lottie', '')
+        base_name = filename_lower.replace('.json', '').replace('.lottie', '')
         safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
         safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
         
@@ -462,6 +463,7 @@ async def import_from_url(
         from urllib.parse import urlparse
         parsed_url = urlparse(url)
         filename = Path(parsed_url.path).name or "imported_animation.json"
+        filename_lower = filename.lower()
         
         # Save locally
         file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
@@ -475,13 +477,13 @@ async def import_from_url(
         preview_url = f"/uploads/previews/{unique_filename}.png"
         
         # Generate proper slug
-        base_name = filename.replace('.json', '').replace('.lottie', '')
+        base_name = filename_lower.replace('.json', '').replace('.lottie', '')
         safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
         safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
         
         # Create template record
         template_data = {
-            "title": filename.replace('.json', '').replace('.lottie', ''),
+            "title": base_name,
             "description": f"Imported from URL: {url}",
             "tags": [],
             "source": "url",
