@@ -139,7 +139,12 @@ const LottieRenderer = ({
       className={`inline-block ${className} ${isSelected ? 'ring-2 ring-orange-500 rounded' : ''}`}
       onClick={onClick}
       onMouseDown={onDragStart}
-      style={{ width: '96px', height: '96px' }}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        minWidth: '150px',
+        minHeight: '150px'
+      }}
     >
       <Lottie
         lottieRef={lottieRef}

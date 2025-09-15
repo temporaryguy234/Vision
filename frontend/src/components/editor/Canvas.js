@@ -2,9 +2,11 @@ import React, { forwardRef, useRef, useEffect, useState, useCallback } from 'rea
 import ElementRenderer from './ElementRenderer';
 import SelectionBox from './SelectionBox';
 import SnapGuides from './SnapGuides';
+import LottieRenderer from './LottieRenderer';
 
 const Canvas = forwardRef(({
   template,
+  animationData,
   editorState,
   selectedElements,
   zoom,
@@ -19,27 +21,34 @@ const Canvas = forwardRef(({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [snapGuides, setSnapGuides] = useState({ x: [], y: [] });
   
-  // Calculate canvas dimensions based on template schema
+  // Calculate canvas dimensions based on template schema or animation data
   useEffect(() => {
+    let width = 400, height = 400;
+    
     if (template?.editable_parameters_schema?.canvas) {
-      const { width, height } = template.editable_parameters_schema.canvas;
-      const aspectRatio = width / height;
-      const maxWidth = 800;
-      const maxHeight = 600;
-      
-      let canvasWidth, canvasHeight;
-      
-      if (aspectRatio > maxWidth / maxHeight) {
-        canvasWidth = maxWidth;
-        canvasHeight = maxWidth / aspectRatio;
-      } else {
-        canvasHeight = maxHeight;
-        canvasWidth = maxHeight * aspectRatio;
-      }
-      
-      setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+      width = template.editable_parameters_schema.canvas.width;
+      height = template.editable_parameters_schema.canvas.height;
+    } else if (animationData) {
+      width = animationData.w || 400;
+      height = animationData.h || 400;
     }
-  }, [template]);
+    
+    const aspectRatio = width / height;
+    const maxWidth = 800;
+    const maxHeight = 600;
+    
+    let canvasWidth, canvasHeight;
+    
+    if (aspectRatio > maxWidth / maxHeight) {
+      canvasWidth = maxWidth;
+      canvasHeight = maxWidth / aspectRatio;
+    } else {
+      canvasHeight = maxHeight;
+      canvasWidth = maxHeight * aspectRatio;
+    }
+    
+    setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+  }, [template, animationData]);
   
   // Handle canvas click (deselect elements)
   const handleCanvasClick = useCallback((e) => {
@@ -217,7 +226,7 @@ const Canvas = forwardRef(({
     return { backgroundColor: bgColor };
   };
   
-  if (!template) return null;
+  if (!template && !animationData) return null;
   
   return (
     <div className="flex items-center justify-center min-h-full p-8">
@@ -241,7 +250,28 @@ const Canvas = forwardRef(({
             height: canvasDimensions.height
           }}
         >
-          {/* Render Elements */}
+          {/* Render Main Lottie Animation */}
+          {animationData && (
+            <div
+              className="absolute inset-0 w-full h-full flex items-center justify-center"
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'center center'
+              }}
+            >
+              <LottieRenderer
+                animationData={animationData}
+                loop={true}
+                autoplay={isPlaying}
+                speed={editorState.canvas?.global_playback_speed || 1.0}
+                isSelected={false}
+                isPlaying={isPlaying}
+                className="w-full h-full"
+              />
+            </div>
+          )}
+          
+          {/* Render Editable Elements */}
           {(template.editable_parameters_schema?.elements || template.manifest?.elements || []).map(element => (
             <ElementRenderer
               key={element.id}
@@ -283,7 +313,8 @@ const Canvas = forwardRef(({
         
         {/* Canvas Info Overlay */}
         <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-          {template.editable_parameters_schema?.canvas?.width || template.manifest?.canvas?.width || 400} × {template.editable_parameters_schema?.canvas?.height || template.manifest?.canvas?.height || 400}
+          {animationData ? `${animationData.w || 400} × ${animationData.h || 400}` : 
+           `${template.editable_parameters_schema?.canvas?.width || template.manifest?.canvas?.width || 400} × ${template.editable_parameters_schema?.canvas?.height || template.manifest?.canvas?.height || 400}`}
           {isPlaying && <span className="ml-2">▶ Playing</span>}
         </div>
         

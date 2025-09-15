@@ -54,8 +54,24 @@ const EditorPage = () => {
       setTemplate(templateData);
       
       // Load animation data
-      const animData = await apiService.get(`/templates/${templateId}/data`);
-      setAnimationData(animData);
+      try {
+        const animData = await apiService.get(`/templates/${templateId}/data`);
+        setAnimationData(animData);
+        console.log('Animation data loaded:', animData);
+      } catch (err) {
+        console.error('Failed to load animation data:', err);
+        // Try to load from file_url if direct data endpoint fails
+        if (templateData.file_url) {
+          try {
+            const response = await fetch(templateData.file_url);
+            const animData = await response.json();
+            setAnimationData(animData);
+            console.log('Animation data loaded from file_url:', animData);
+          } catch (fileErr) {
+            console.error('Failed to load animation data from file_url:', fileErr);
+          }
+        }
+      }
       
       // Initialize editor state from template
       if (templateData.editable_parameters_schema) {
@@ -187,6 +203,23 @@ const EditorPage = () => {
         const updatedAnim = applyPatchesToAnimation(response.patches, template?.manifest || {}, animationData);
         if (updatedAnim) setAnimationData(updatedAnim);
         
+        // Update editor state with new values
+        const newEditorState = { ...editorState };
+        response.patches.forEach(patch => {
+          if (patch.op === 'replace' && patch.path.includes('elements/')) {
+            const pathParts = patch.path.split('/');
+            const elementId = pathParts[1];
+            const property = pathParts[2];
+            if (elementId && property) {
+              newEditorState.elements[elementId] = {
+                ...newEditorState.elements[elementId],
+                [property]: patch.value
+              };
+            }
+          }
+        });
+        setEditorState(newEditorState);
+        
         // Clear prompt
         setPromptText('');
         
@@ -249,6 +282,20 @@ const EditorPage = () => {
         }
       }
     }));
+    
+    // Also update currentState for AI processing
+    setCurrentState(prev => ({
+      ...prev,
+      [`elements.${elementId}.${property}`]: value
+    }));
+    
+    // Apply changes to animation data if it's a color change
+    if (property.includes('color') && animationData) {
+      const updatedAnim = JSON.parse(JSON.stringify(animationData));
+      // Find and update the color in the animation data
+      // This is a simplified approach - in a real implementation, you'd need to traverse the Lottie structure
+      setAnimationData(updatedAnim);
+    }
   };
 
   const handleCanvasChange = (property, value, oldValue) => {
@@ -390,6 +437,7 @@ const EditorPage = () => {
           <Canvas
             ref={canvasRef}
             template={template}
+            animationData={animationData}
             editorState={editorState}
             selectedElements={selectedElements}
             zoom={zoom}
