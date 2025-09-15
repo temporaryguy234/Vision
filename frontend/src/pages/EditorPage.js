@@ -370,7 +370,7 @@ const EditorPage = () => {
     }));
   };
 
-  const handlePropertyChange = (elementId, property, value) => {
+  const handlePropertyChange = async (elementId, property, value) => {
     setEditorState(prev => ({
       ...prev,
       elements: {

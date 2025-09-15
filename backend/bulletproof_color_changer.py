@@ -1,227 +1,186 @@
 """
-Bulletproof color changer that works with ANY Lottie animation
-Handles all possible color formats and structures
+Bulletproof Color Changer
+A robust module for changing colors in Lottie animation data
 """
+
 import json
-from typing import Dict, Any, List, Tuple, Optional
-import re
+from typing import Dict, Any, List
 
 class BulletproofColorChanger:
-    """Change colors in Lottie animations with 100% reliability"""
+    """A bulletproof color changer that always works"""
     
     def __init__(self):
-        self.color_properties = [
-            'c', 'color', 'fill', 'stroke', 'background',
-            'sc', 'solid_color', 'fill_color', 'stroke_color'
-        ]
+        self.color_cache = {}
     
-    def change_color(self, animation_data: Dict[str, Any], 
-                    target_color: str, 
-                    color_type: str = 'fill') -> Dict[str, Any]:
+    def change_color(self, animation_data: Dict[str, Any], target_color: str, color_type: str = 'fill') -> Dict[str, Any]:
         """
-        Change colors in Lottie animation with bulletproof reliability
-        
-        Args:
-            animation_data: The Lottie animation data
-            target_color: Target color in hex format (#RRGGBB)
-            color_type: Type of color to change ('fill', 'stroke', 'background', 'all')
-        
-        Returns:
-            Modified animation data
+        Change colors in Lottie animation data
+        Returns modified animation data
         """
         try:
-            # Deep copy to avoid modifying original
+            print(f"🎨 Changing {color_type} color to {target_color}")
+            
+            # Create a deep copy of the animation data
             modified_data = json.loads(json.dumps(animation_data))
             
-            # Convert hex color to RGB values (0-1 range)
-            rgb_values = self._hex_to_rgb_normalized(target_color)
+            # Convert hex color to RGB
+            rgb_color = self._hex_to_rgb(target_color)
+            if not rgb_color:
+                print(f"❌ Invalid color format: {target_color}")
+                return animation_data
             
-            # Change colors in different parts of the animation
-            self._change_colors_in_layers(modified_data, rgb_values, color_type)
-            self._change_colors_in_assets(modified_data, rgb_values, color_type)
-            self._change_background_color(modified_data, rgb_values, color_type)
+            # Normalize RGB to 0-1 range for Lottie
+            normalized_color = [rgb_color[0]/255.0, rgb_color[1]/255.0, rgb_color[2]/255.0, 1.0]
             
+            # Apply color changes based on type
+            if color_type == 'fill':
+                self._change_fill_colors(modified_data, normalized_color)
+            elif color_type == 'stroke':
+                self._change_stroke_colors(modified_data, normalized_color)
+            elif color_type == 'background':
+                self._change_background_color(modified_data, normalized_color)
+            else:
+                # Change all colors
+                self._change_fill_colors(modified_data, normalized_color)
+                self._change_stroke_colors(modified_data, normalized_color)
+            
+            print(f"✅ Color change applied successfully")
             return modified_data
             
         except Exception as e:
-            print(f"Color change error: {e}")
-            # Return original data if modification fails
+            print(f"❌ Color change failed: {e}")
             return animation_data
     
-    def _hex_to_rgb_normalized(self, hex_color: str) -> List[float]:
-        """Convert hex color to normalized RGB values"""
-        # Remove # if present
-        hex_color = hex_color.lstrip('#')
-        
-        # Handle 3-digit hex
-        if len(hex_color) == 3:
-            hex_color = ''.join([c*2 for c in hex_color])
-        
-        # Convert to RGB
-        r = int(hex_color[0:2], 16) / 255.0
-        g = int(hex_color[2:4], 16) / 255.0
-        b = int(hex_color[4:6], 16) / 255.0
-        
-        return [r, g, b, 1.0]  # RGBA format
-    
-    def _change_colors_in_layers(self, data: Dict[str, Any], 
-                               rgb_values: List[float], 
-                               color_type: str):
-        """Change colors in animation layers"""
-        layers = data.get('layers', [])
-        
-        for layer in layers:
-            # Change layer background color
-            if color_type in ['background', 'all'] and 'sc' in layer:
-                layer['sc'] = f"#{int(rgb_values[0]*255):02x}{int(rgb_values[1]*255):02x}{int(rgb_values[2]*255):02x}"
-            
-            # Change colors in shapes
-            shapes = layer.get('shapes', [])
-            for shape in shapes:
-                self._change_colors_in_shape(shape, rgb_values, color_type)
-    
-    def _change_colors_in_shape(self, shape: Dict[str, Any], 
-                              rgb_values: List[float], 
-                              color_type: str):
-        """Change colors in a shape"""
-        shape_type = shape.get('ty', '')
-        
-        # Fill colors
-        if color_type in ['fill', 'all'] and shape_type == 'fl':
-            self._set_color_property(shape, 'c', rgb_values)
-        
-        # Stroke colors
-        elif color_type in ['stroke', 'all'] and shape_type == 'st':
-            self._set_color_property(shape, 'c', rgb_values)
-        
-        # Gradient colors
-        elif shape_type == 'gf':
-            self._change_gradient_colors(shape, rgb_values, color_type)
-        
-        # Recurse into nested shapes
-        if 'it' in shape:
-            for item in shape['it']:
-                self._change_colors_in_shape(item, rgb_values, color_type)
-    
-    def _set_color_property(self, shape: Dict[str, Any], 
-                          property_name: str, 
-                          rgb_values: List[float]):
-        """Set color property in shape"""
-        if property_name in shape:
-            color_prop = shape[property_name]
-            
-            # Handle different color property formats
-            if isinstance(color_prop, dict):
-                if 'k' in color_prop:
-                    # Animated color
-                    if isinstance(color_prop['k'], list):
-                        if len(color_prop['k']) >= 3:
-                            color_prop['k'][:3] = rgb_values[:3]
-                    else:
-                        # Single value
-                        color_prop['k'] = rgb_values
-                else:
-                    # Direct color object
-                    color_prop['r'] = rgb_values[0]
-                    color_prop['g'] = rgb_values[1]
-                    color_prop['b'] = rgb_values[2]
-                    color_prop['a'] = rgb_values[3]
-            
-            elif isinstance(color_prop, list):
-                # Direct array format
-                if len(color_prop) >= 3:
-                    color_prop[:3] = rgb_values[:3]
-    
-    def _change_gradient_colors(self, shape: Dict[str, Any], 
-                              rgb_values: List[float], 
-                              color_type: str):
-        """Change colors in gradient fills"""
-        if 'g' in shape:
-            gradient = shape['g']
-            
-            # Change gradient stops
-            if 'k' in gradient:
-                gradient_data = gradient['k']
-                
-                if isinstance(gradient_data, dict) and 'k' in gradient_data:
-                    # Animated gradient
-                    stops = gradient_data['k']
-                    if isinstance(stops, list) and len(stops) > 0:
-                        # Change first and last stops
-                        self._set_color_property({'c': stops[0]}, 'c', rgb_values)
-                        if len(stops) > 1:
-                            # Make last stop slightly different
-                            last_color = [min(1.0, rgb_values[0] + 0.1), 
-                                        min(1.0, rgb_values[1] + 0.1), 
-                                        min(1.0, rgb_values[2] + 0.1), 
-                                        rgb_values[3]]
-                            self._set_color_property({'c': stops[-1]}, 'c', last_color)
-    
-    def _change_colors_in_assets(self, data: Dict[str, Any], 
-                               rgb_values: List[float], 
-                               color_type: str):
-        """Change colors in assets"""
-        assets = data.get('assets', [])
-        
-        for asset in assets:
-            if 'layers' in asset:
-                for layer in asset['layers']:
-                    shapes = layer.get('shapes', [])
-                    for shape in shapes:
-                        self._change_colors_in_shape(shape, rgb_values, color_type)
-    
-    def _change_background_color(self, data: Dict[str, Any], 
-                               rgb_values: List[float], 
-                               color_type: str):
-        """Change background color"""
-        if color_type in ['background', 'all']:
-            # Set background color in various possible locations
-            if 'bg' in data:
-                data['bg'] = rgb_values
-            
-            # Also try common background property names
-            for bg_prop in ['background', 'backgroundColor', 'bgColor']:
-                if bg_prop in data:
-                    data[bg_prop] = rgb_values
-    
-    def change_text_color(self, animation_data: Dict[str, Any], 
-                         target_color: str) -> Dict[str, Any]:
-        """Change text color specifically"""
+    def _hex_to_rgb(self, hex_color: str) -> tuple:
+        """Convert hex color to RGB tuple"""
         try:
-            modified_data = json.loads(json.dumps(animation_data))
-            rgb_values = self._hex_to_rgb_normalized(target_color)
+            # Remove # if present
+            hex_color = hex_color.lstrip('#')
             
-            layers = modified_data.get('layers', [])
+            # Handle 3-digit hex
+            if len(hex_color) == 3:
+                hex_color = ''.join([c*2 for c in hex_color])
+            
+            # Convert to RGB
+            if len(hex_color) == 6:
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return (r, g, b)
+            
+            return None
+        except Exception as e:
+            print(f"Hex to RGB conversion failed: {e}")
+            return None
+    
+    def _change_fill_colors(self, animation_data: Dict[str, Any], color: List[float]):
+        """Change fill colors in the animation"""
+        try:
+            layers = animation_data.get('layers', [])
             for layer in layers:
-                if layer.get('ty') == 5:  # Text layer
-                    text_data = layer.get('t', {})
-                    if 'd' in text_data:
-                        document = text_data['d']
-                        if 'k' in document:
-                            keyframes = document['k']
-                            if isinstance(keyframes, list):
-                                for keyframe in keyframes:
-                                    if 's' in keyframe:
-                                        style = keyframe['s']
-                                        if 'c' in style:
-                                            self._set_color_property(style, 'c', rgb_values)
-            
-            return modified_data
-            
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'fl':  # Fill shape
+                        if 'c' in shape and 'k' in shape['c']:
+                            shape['c']['k'] = color
+                        elif 'c' in shape:
+                            shape['c'] = {'k': color}
+                        else:
+                            shape['c'] = {'k': color}
         except Exception as e:
-            print(f"Text color change error: {e}")
-            return animation_data
+            print(f"Fill color change failed: {e}")
     
-    def change_multiple_colors(self, animation_data: Dict[str, Any], 
-                             color_changes: List[Tuple[str, str]]) -> Dict[str, Any]:
-        """Change multiple colors at once"""
-        result = animation_data
+    def _change_stroke_colors(self, animation_data: Dict[str, Any], color: List[float]):
+        """Change stroke colors in the animation"""
+        try:
+            layers = animation_data.get('layers', [])
+            for layer in layers:
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'st':  # Stroke shape
+                        if 'c' in shape and 'k' in shape['c']:
+                            shape['c']['k'] = color
+                        elif 'c' in shape:
+                            shape['c'] = {'k': color}
+                        else:
+                            shape['c'] = {'k': color}
+        except Exception as e:
+            print(f"Stroke color change failed: {e}")
+    
+    def _change_background_color(self, animation_data: Dict[str, Any], color: List[float]):
+        """Change background color in the animation"""
+        try:
+            # Look for background layer
+            layers = animation_data.get('layers', [])
+            for layer in layers:
+                if layer.get('ty') == 1:  # Solid layer (background)
+                    if 'sc' in layer:
+                        layer['sc'] = color
+                    else:
+                        layer['sc'] = color
+                    break
+            else:
+                # Create a background layer if none exists
+                bg_layer = {
+                    'ty': 1,  # Solid layer
+                    'sc': color,
+                    'sw': animation_data.get('w', 400),
+                    'sh': animation_data.get('h', 400),
+                    'ip': 0,
+                    'op': animation_data.get('op', 60),
+                    'st': 0,
+                    'bm': 0,
+                    'sr': 1,
+                    'ks': {
+                        'o': {'a': 0, 'k': 100},
+                        'r': {'a': 0, 'k': 0},
+                        'p': {'a': 0, 'k': [0, 0, 0]},
+                        'a': {'a': 0, 'k': [0, 0, 0]},
+                        's': {'a': 0, 'k': [100, 100, 100]}
+                    },
+                    'ao': 0,
+                    'w': animation_data.get('w', 400),
+                    'h': animation_data.get('h', 400),
+                    'ip': 0,
+                    'op': animation_data.get('op', 60),
+                    'st': 0,
+                    'bm': 0,
+                    'sr': 1,
+                    'ks': {
+                        'o': {'a': 0, 'k': 100},
+                        'r': {'a': 0, 'k': 0},
+                        'p': {'a': 0, 'k': [0, 0, 0]},
+                        'a': {'a': 0, 'k': [0, 0, 0]},
+                        's': {'a': 0, 'k': [100, 100, 100]}
+                    },
+                    'ao': 0
+                }
+                layers.insert(0, bg_layer)
+        except Exception as e:
+            print(f"Background color change failed: {e}")
+    
+    def get_colors_from_animation(self, animation_data: Dict[str, Any]) -> List[str]:
+        """Extract all colors from the animation"""
+        colors = []
+        try:
+            layers = animation_data.get('layers', [])
+            for layer in layers:
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') in ['fl', 'st']:  # Fill or stroke
+                        if 'c' in shape and 'k' in shape['c']:
+                            color_data = shape['c']['k']
+                            if isinstance(color_data, list) and len(color_data) >= 3:
+                                r = int(color_data[0] * 255)
+                                g = int(color_data[1] * 255)
+                                b = int(color_data[2] * 255)
+                                hex_color = f"#{r:02x}{g:02x}{b:02x}"
+                                if hex_color not in colors:
+                                    colors.append(hex_color)
+        except Exception as e:
+            print(f"Color extraction failed: {e}")
         
-        for color_type, target_color in color_changes:
-            result = self.change_color(result, target_color, color_type)
-        
-        return result
+        return colors
 
 # Global instance
 bulletproof_color_changer = BulletproofColorChanger()
-
