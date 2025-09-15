@@ -1252,28 +1252,47 @@ async def proxy_fetch_json(url: str = Query(..., description="HTTP(S) URL to fet
 # Direct endpoint for serving Lottie files from uploads directory
 @api_router.get("/lottie/{file_path:path}")
 async def serve_lottie_file(file_path: str):
-    """Serve Lottie files directly from uploads directory with proper CORS headers"""
+    """Serve Lottie files (.json or .lottie) from uploads directory."""
     try:
         # Security: ensure the file is within uploads directory
         full_path = UPLOADS_DIR / file_path
-        if not full_path.resolve().is_relative_to(UPLOADS_DIR.resolve()):
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+        try:
+            # Python 3.9+: ensure path containment
+            if not full_path.resolve().is_relative_to(UPLOADS_DIR.resolve()):
+                raise HTTPException(status_code=403, detail="Access denied")
+        except AttributeError:
+            # Fallback for older Python versions
+            if UPLOADS_DIR.resolve() not in full_path.resolve().parents and full_path.resolve() != UPLOADS_DIR.resolve():
+                raise HTTPException(status_code=403, detail="Access denied")
+
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
-        
-        # Read and return the file content
+
+        # Handle .lottie containers
+        if full_path.suffix.lower() == '.lottie':
+            import zipfile
+            try:
+                with zipfile.ZipFile(full_path, 'r') as zip_file:
+                    if 'data.json' in zip_file.namelist():
+                        with zip_file.open('data.json') as json_file:
+                            return json.loads(json_file.read().decode('utf-8'))
+                    json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                    if json_files:
+                        with zip_file.open(json_files[0]) as json_file:
+                            return json.loads(json_file.read().decode('utf-8'))
+                    raise HTTPException(status_code=400, detail=".lottie file contains no JSON")
+            except Exception as e:
+                logger.error(f"Error reading .lottie file {file_path}: {e}")
+                raise HTTPException(status_code=400, detail="Invalid .lottie file")
+
+        # Plain JSON
         with open(full_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
-        # Try to parse as JSON to validate it's a valid Lottie file
         try:
-            json_data = json.loads(content)
+            return json.loads(content)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON file")
-        
-        return json_data
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1294,19 +1313,37 @@ async def lf_animation_data(animation_id: str):
     details = await lottiefiles_service.get_animation_details(animation_id)
     if not details:
         raise HTTPException(status_code=404, detail="Animation not found")
-    data = await lottiefiles_service.download_animation(details.file_url)
+    # details expected to be a dict
+    file_url = details.get("file_url") if isinstance(details, dict) else None
+    if not file_url:
+        raise HTTPException(status_code=404, detail="Animation file URL not available")
+    data = await lottiefiles_service.download_animation(file_url)
     if not data:
         raise HTTPException(status_code=404, detail="Animation data not available")
     return data
 
 @api_router.post("/lottiefiles/animation/{animation_id}/import")
-async def lf_import_animation(animation_id: str, current_user: Optional[User] = Depends(get_current_user_optional), db=Depends(get_database)):
+async def lf_import_animation(
+    animation_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
+    db=Depends(get_database)
+):
     details = await lottiefiles_service.get_animation_details(animation_id)
     if not details:
         raise HTTPException(status_code=404, detail="Animation not found")
 
+    # Expect dict structure
+    name = details.get("name") if isinstance(details, dict) else None
+    description = (details.get("description") or "Imported from curated LottieFiles") if isinstance(details, dict) else "Imported from curated LottieFiles"
+    tags = details.get("tags", []) if isinstance(details, dict) else []
+    category = details.get("category") if isinstance(details, dict) else TemplateCategory.MISCELLANEOUS
+    dimensions = details.get("dimensions", {}) if isinstance(details, dict) else {}
+    file_url = details.get("file_url") if isinstance(details, dict) else None
+    if not file_url:
+        raise HTTPException(status_code=404, detail="Animation file URL not available")
+
     # Get animation data
-    data = await lottiefiles_service.download_animation(details.file_url)
+    data = await lottiefiles_service.download_animation(file_url)
     if not data:
         raise HTTPException(status_code=404, detail="Animation data not available")
 
@@ -1320,25 +1357,34 @@ async def lf_import_animation(animation_id: str, current_user: Optional[User] = 
     async with aiofiles.open(file_path, 'w') as f:
         await f.write(json.dumps(data))
 
+    # Generate actual preview assets
+    saved_file_url = f"/uploads/{unique_filename}"
+    preview_image_url = await file_storage_manager.generate_thumbnail(saved_file_url, AssetType.LOTTIE_JSON)
+    preview_video_url = await file_storage_manager.generate_preview_video(saved_file_url, AssetType.LOTTIE_JSON)
+
     # Create template
-    preview_url = f"/uploads/previews/{unique_filename}.png"
     template_data = {
-        "title": details.name,
-        "description": details.description or "Imported from curated LottieFiles",
-        "tags": details.tags,
+        "title": name or f"Animation {animation_id}",
+        "description": description,
+        "tags": tags,
         "source": "lottiefiles",
         "license": "",
         "author": "",
         "creator_id": current_user.id if current_user else "anonymous",
-        "file_url": f"/uploads/{unique_filename}",
-        "preview_url": preview_url,
+        "file_url": saved_file_url,
+        "preview_url": preview_image_url or "",
         "manifest": await lottie_processor._generate_manifest(data),
-        "category": details.category,
-        "slug": details.name.lower().replace(' ', '-'),
-        "preview_image_url": preview_url,
-        "preview_video_url": "",
+        "category": category or TemplateCategory.MISCELLANEOUS,
+        "slug": (name or f"animation-{file_hash}").lower().replace(' ', '-'),
+        "preview_image_url": preview_image_url or "",
+        "preview_video_url": preview_video_url or "",
         "editable_parameters_schema": {
-            "canvas": {"width": details.dimensions.get("width", 400), "height": details.dimensions.get("height", 400), "background_color": "#FFFFFF", "global_playback_speed": 1.0},
+            "canvas": {
+                "width": int(dimensions.get("width", data.get("w", 400))),
+                "height": int(dimensions.get("height", data.get("h", 400))),
+                "background_color": "#FFFFFF",
+                "global_playback_speed": 1.0
+            },
             "elements": []
         },
         "is_public": True
@@ -1351,7 +1397,9 @@ async def lf_import_animation(animation_id: str, current_user: Optional[User] = 
         "template_id": template.id,
         "template_title": template.title,
         "category": template.category,
-        "file_url": template.file_url
+        "file_url": template.file_url,
+        "preview_image_url": template.preview_image_url,
+        "preview_video_url": template.preview_video_url
     }
 if __name__ == "__main__":
     import uvicorn
