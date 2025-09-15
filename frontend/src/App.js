@@ -21,6 +21,7 @@ import RegisterModal from './components/auth/RegisterModal';
 import SubscriptionModal from './components/subscription/SubscriptionModal';
 import SubscriptionBanner from './components/subscription/SubscriptionBanner';
 import { useAuth, AuthProvider } from './contexts/AuthContext';
+import './App.css';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';

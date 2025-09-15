@@ -35,7 +35,7 @@ const EditorPage = () => {
     elements: {}
   });
   const [selectedElements, setSelectedElements] = useState([]);
-  const [zoom, setZoom] = useState(1.0);
+  const [zoom, setZoom] = useState(100);
   const [activeTab, setActiveTab] = useState('Properties');
   const [commandInput, setCommandInput] = useState('');
   
@@ -60,11 +60,23 @@ const EditorPage = () => {
         console.log('Animation data loaded:', animData);
       } catch (err) {
         console.error('Failed to load animation data:', err);
-        // Try to load from file_url if direct data endpoint fails
+        // Try to load from file_url using backend proxy if direct data endpoint fails
         if (templateData.file_url) {
           try {
-            const response = await fetch(templateData.file_url);
-            const animData = await response.json();
+            const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+            let animData;
+            if (templateData.file_url.startsWith('/uploads/')) {
+              const filePath = templateData.file_url.replace('/uploads/', '');
+              animData = await apiService.get(`/lottie/${filePath}`);
+            } else {
+              try {
+                const resp = await fetch(templateData.file_url);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                animData = await resp.json();
+              } catch (fetchErr) {
+                animData = await apiService.get(`/proxy/fetch-json?url=${encodeURIComponent(templateData.file_url)}`);
+              }
+            }
             setAnimationData(animData);
             console.log('Animation data loaded from file_url:', animData);
           } catch (fileErr) {
@@ -183,23 +195,11 @@ const EditorPage = () => {
       setPromptLoading(true);
       
       // Use the full AI service for natural language processing
-      const response = await fetch(`/api/templates/${template.id}/prompt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          prompt: promptText.trim(),
-          state: currentState
-        })
+      // Use apiService to ensure base URL and auth headers are applied
+      const result = await apiService.processPrompt(template.id, {
+        prompt: promptText.trim(),
+        state: currentState
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
       
       if (result.patches && result.patches.length > 0) {
         // Apply AI-generated patches
@@ -337,6 +337,13 @@ const EditorPage = () => {
   const handleSpeedChange = (newSpeed) => {
     setSpeed(newSpeed);
     setCurrentState(prev => ({ ...prev, speed: newSpeed }));
+    setEditorState(prev => ({
+      ...prev,
+      canvas: {
+        ...prev.canvas,
+        global_playback_speed: newSpeed
+      }
+    }));
   };
 
   // Editor event handlers

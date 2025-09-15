@@ -233,8 +233,8 @@ const Canvas = forwardRef(({
       <div 
         className="relative shadow-2xl rounded-lg overflow-hidden border border-gray-300"
         style={{
-          width: canvasDimensions.width * (zoom / 100),
-          height: canvasDimensions.height * (zoom / 100),
+          width: canvasDimensions.width,
+          height: canvasDimensions.height,
           ...getCanvasBackground()
         }}
       >
@@ -254,10 +254,7 @@ const Canvas = forwardRef(({
           {animationData && (
             <div
               className="absolute inset-0 w-full h-full flex items-center justify-center"
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center'
-              }}
+              style={{}}
             >
               <LottieRenderer
                 animationData={animationData}
