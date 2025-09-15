@@ -283,7 +283,7 @@ const Canvas = forwardRef(({
         
         {/* Canvas Info Overlay */}
         <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-          {template.editable_parameters_schema.canvas.width} × {template.editable_parameters_schema.canvas.height}
+          {template.editable_parameters_schema?.canvas?.width || template.manifest?.canvas?.width || 400} × {template.editable_parameters_schema?.canvas?.height || template.manifest?.canvas?.height || 400}
           {isPlaying && <span className="ml-2">▶ Playing</span>}
         </div>
         

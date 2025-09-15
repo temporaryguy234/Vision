@@ -40,6 +40,7 @@ const EditorPage = () => {
   const [commandInput, setCommandInput] = useState('');
   
   const { user } = useAuth();
+  const canvasRef = useRef();
 
   // Load template data
   useEffect(() => {
@@ -387,7 +388,7 @@ const EditorPage = () => {
         {/* Canvas Area */}
         <div className="flex-1 flex items-center justify-center p-8 bg-gray-100">
           <Canvas
-            ref={useRef()}
+            ref={canvasRef}
             template={template}
             editorState={editorState}
             selectedElements={selectedElements}
@@ -436,6 +437,7 @@ const EditorPage = () => {
           onPropertyChange={handlePropertyChange}
           onCanvasChange={handleCanvasChange}
           onApplyBrandKit={handleApplyBrandKit}
+          brandKits={[]}
         />
       </div>
       
