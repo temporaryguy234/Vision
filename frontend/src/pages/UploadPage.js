@@ -73,7 +73,35 @@ const UploadPage = () => {
     setIsProcessing(true);
     try {
       const result = await apiService.importFromUrl(urlInput);
-      setUploadedFiles(prev => [...prev, result]);
+
+      // Generate previews client-side: last-frame PNG + 2.5s WebM (mirror upload flow)
+      try {
+        // Use the animation data returned from the import
+        const animData = result.animation_data || await apiService.getTemplateData(result.id);
+        const { webmBlob, pngBlob } = await renderLottiePreview({
+          animationData: animData,
+          width: animData.w || 400,
+          height: animData.h || 400,
+          durationSeconds: 2.5,
+          fps: animData.fr || 30
+        });
+
+        await apiService.uploadTemplatePreviews(result.id, {
+          imageFile: new File([pngBlob], `${result.id}_thumb.png`, { type: 'image/png' }),
+          videoFile: new File([webmBlob], `${result.id}_preview.webm`, { type: 'video/webm' })
+        });
+      } catch (e) {
+        console.warn('Preview generation failed (continuing without):', e);
+      }
+
+      setUploadedFiles(prev => [...prev, {
+        id: result.id,
+        name: result.name,
+        status: 'success',
+        templateId: result.id,
+        preview: result.preview_url,
+        manifest: result.manifest
+      }]);
       setUrlInput('');
     } catch (error) {
       console.error('URL import error:', error);
@@ -81,7 +109,7 @@ const UploadPage = () => {
         id: Date.now() + Math.random(),
         name: urlInput,
         status: 'error',
-        error: error.message
+        error: error.response?.data?.detail || error.message || 'Import failed'
       }]);
     }
     setIsProcessing(false);

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lottie Import Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="url"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .preview img, .preview video {
+            max-width: 100%;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .example-urls {
+            margin-top: 10px;
+        }
+        .example-urls a {
+            display: block;
+            margin: 5px 0;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .example-urls a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Lottie Import Test</h1>
+        
+        <div class="info">
+            <strong>Test the Lottie import functionality:</strong>
+            <p>This tool will test importing Lottie animations from URLs and generate thumbnails and preview videos.</p>
+            <div class="example-urls">
+                <strong>Example URLs to test:</strong>
+                <a href="#" onclick="setUrl('https://lottie.host/85036dbf-44d5-420d-aa24-325988579179/bN9lsInwGh.json')">Location Icon Animation (.json)</a>
+                <a href="#" onclick="setUrl('https://lottie.host/65f212d9-375e-4f67-90f0-419290fb3d7c/mXVqILbJx7.lottie')">Another Animation (.lottie)</a>
+            </div>
+        </div>
+
+        <form id="importForm">
+            <div class="form-group">
+                <label for="lottieUrl">Lottie Animation URL:</label>
+                <input type="url" id="lottieUrl" name="url" placeholder="https://lottie.host/..." required>
+            </div>
+            <button type="submit" id="submitBtn">Import Lottie Animation</button>
+        </form>
+
+        <div id="result" class="result"></div>
+        <div id="preview" class="preview"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('importForm');
+        const result = document.getElementById('result');
+        const preview = document.getElementById('preview');
+        const submitBtn = document.getElementById('submitBtn');
+        const urlInput = document.getElementById('lottieUrl');
+
+        function setUrl(url) {
+            urlInput.value = url;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Importing...';
+            result.style.display = 'none';
+            preview.innerHTML = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('url', url);
+
+                const response = await fetch('/api/test/import-lottie', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(data);
+                } else {
+                    showError(data.error || data.message || 'Import failed');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Import Lottie Animation';
+            }
+        });
+
+        function showSuccess(data) {
+            result.className = 'result success';
+            result.style.display = 'block';
+            
+            let html = `
+                <h3>✅ Import Successful!</h3>
+                <p><strong>Animation Info:</strong></p>
+                <ul>
+                    <li>Version: ${data.animation_data.version || 'Unknown'}</li>
+                    <li>Dimensions: ${data.animation_data.width} × ${data.animation_data.height}</li>
+                    <li>Frame Rate: ${data.animation_data.frame_rate} fps</li>
+                    <li>Duration: ${data.animation_data.duration} seconds</li>
+                    <li>Layers: ${data.animation_data.layers_count}</li>
+                </ul>
+                <p><strong>Generated Files:</strong></p>
+                <ul>
+                    <li>Thumbnail: <a href="${data.thumbnail_url}" target="_blank">View Thumbnail</a></li>
+                    <li>Preview Video: <a href="${data.preview_video_url}" target="_blank">View Preview</a></li>
+                </ul>
+            `;
+            
+            if (data.manifest && Object.keys(data.manifest).length > 0) {
+                html += `<p><strong>Editable Elements Found:</strong></p><ul>`;
+                if (data.manifest.text && data.manifest.text.length > 0) {
+                    html += `<li>Text elements: ${data.manifest.text.length}</li>`;
+                }
+                if (data.manifest.images && data.manifest.images.length > 0) {
+                    html += `<li>Image elements: ${data.manifest.images.length}</li>`;
+                }
+                if (data.manifest.colors && data.manifest.colors.length > 0) {
+                    html += `<li>Color elements: ${data.manifest.colors.length}</li>`;
+                }
+                html += `</ul>`;
+            }
+            
+            result.innerHTML = html;
+
+            // Show previews
+            if (data.thumbnail_url) {
+                preview.innerHTML = `
+                    <h3>Generated Thumbnail:</h3>
+                    <img src="${data.thumbnail_url}" alt="Thumbnail" style="max-width: 300px; margin: 10px;">
+                    ${data.preview_video_url ? `
+                        <h3>Preview Video:</h3>
+                        <video controls style="max-width: 400px; margin: 10px;">
+                            <source src="${data.preview_video_url}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    ` : ''}
+                `;
+            }
+        }
+
+        function showError(message) {
+            result.className = 'result error';
+            result.style.display = 'block';
+            result.innerHTML = `
+                <h3>❌ Import Failed</h3>
+                <p><strong>Error:</strong> ${message}</p>
+                <p>Please check the URL and try again.</p>
+            `;
+        }
+    </script>
+</body>
+</html>

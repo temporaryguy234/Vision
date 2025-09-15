@@ -1,0 +1,137 @@
+# Emergent AI Deployment Configuration for MotionEdit
+name: motionedit
+description: "AI-powered motion graphics template platform with Lottie import and customization"
+
+# Application Configuration
+app:
+  name: "MotionEdit"
+  version: "1.0.0"
+  description: "Import, customize, and export motion graphics templates with AI"
+
+# Infrastructure
+infrastructure:
+  provider: "aws"  # or "gcp", "azure"
+  region: "us-east-1"
+  environment: "production"
+
+# Services
+services:
+  backend:
+    type: "fastapi"
+    port: 8001
+    health_check: "/health"
+    environment:
+      - MONGO_URL=${MONGO_URL}
+      - UPLOADS_DIR=/app/uploads
+      - EXPORTS_DIR=/app/exports
+    volumes:
+      - uploads_data:/app/uploads
+      - exports_data:/app/exports
+    resources:
+      cpu: "1"
+      memory: "2Gi"
+    scaling:
+      min_replicas: 2
+      max_replicas: 10
+      target_cpu: 70
+
+  frontend:
+    type: "react"
+    port: 80
+    build_command: "npm run build"
+    environment:
+      - REACT_APP_BACKEND_URL=${BACKEND_URL}
+    resources:
+      cpu: "0.5"
+      memory: "1Gi"
+    scaling:
+      min_replicas: 2
+      max_replicas: 5
+      target_cpu: 80
+
+# Database
+database:
+  type: "mongodb"
+  version: "6.0"
+  storage: "20Gi"
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+
+# Storage
+storage:
+  uploads:
+    type: "s3"
+    bucket: "motionedit-uploads"
+    region: "us-east-1"
+  exports:
+    type: "s3"
+    bucket: "motionedit-exports"
+    region: "us-east-1"
+
+# CDN
+cdn:
+  enabled: true
+  provider: "cloudfront"
+  domains:
+    - "api.motionedit.com"
+    - "app.motionedit.com"
+
+# Monitoring
+monitoring:
+  enabled: true
+  metrics:
+    - cpu
+    - memory
+    - disk
+    - network
+  logging:
+    level: "info"
+    retention: "30d"
+  alerts:
+    - type: "cpu_high"
+      threshold: 80
+    - type: "memory_high"
+      threshold: 85
+    - type: "error_rate"
+      threshold: 5
+
+# Security
+security:
+  ssl:
+    enabled: true
+    certificate: "letsencrypt"
+  cors:
+    allowed_origins:
+      - "https://app.motionedit.com"
+      - "https://*.motionedit.com"
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+  authentication:
+    jwt:
+      secret: ${JWT_SECRET}
+      expiry: "24h"
+
+# Environment Variables
+env:
+  JWT_SECRET: ${JWT_SECRET}
+  MONGO_URL: ${MONGO_URL}
+  BACKEND_URL: ${BACKEND_URL}
+  STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+  PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID}
+  PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+# Deployment
+deployment:
+  strategy: "rolling"
+  health_check:
+    path: "/health"
+    interval: 30
+    timeout: 5
+    retries: 3
+  rollback:
+    enabled: true
+    max_revisions: 5

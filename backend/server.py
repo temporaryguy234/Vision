@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -192,9 +192,15 @@ app = FastAPI(title="MotionEdit API", lifespan=lifespan)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        "https://*.vercel.app",
+        "https://*.netlify.app",
+        "https://*.github.io"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -206,8 +212,12 @@ UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
 ).mkdir(exist_ok=True, parents=True)
 
 # Mount static files
+# Ensure exports directory exists before mounting
+EXPORTS_DIR = Path(os.environ.get('EXPORTS_DIR', "/app/exports"))
+EXPORTS_DIR.mkdir(exist_ok=True, parents=True)
+
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-app.mount("/exports", StaticFiles(directory="/app/exports"), name="exports")
+app.mount("/exports", StaticFiles(directory=str(EXPORTS_DIR)), name="exports")
 
 # API Router
 api_router = APIRouter(prefix="/api")
@@ -397,9 +407,26 @@ async def upload_template(
         # Process file
         animation_data, manifest = await lottie_processor.process_file(file_path)
         
-        # Generate preview (placeholder for now)
-        preview_url = f"/uploads/previews/{unique_filename}.png"
-        preview_video_url = ""
+        # Generate thumbnail and preview video
+        from lottie_thumbnail_generator import lottie_thumbnail_generator
+        
+        # Create previews directory
+        previews_dir = UPLOADS_DIR / "previews"
+        previews_dir.mkdir(exist_ok=True)
+        
+        # Generate thumbnail
+        thumbnail_path = previews_dir / f"{unique_filename}_thumb.png"
+        await lottie_thumbnail_generator.generate_thumbnail(
+            animation_data, thumbnail_path, 300, 200
+        )
+        preview_url = f"/uploads/previews/{unique_filename}_thumb.png"
+        
+        # Generate preview video
+        preview_video_path = previews_dir / f"{unique_filename}_preview.mp4"
+        await lottie_thumbnail_generator.generate_preview_video(
+            animation_data, preview_video_path, 400, 300, 3.0
+        )
+        preview_video_url = f"/uploads/previews/{unique_filename}_preview.mp4"
         
         # Generate proper slug
         base_name = file.filename.replace('.json', '').replace('.lottie', '')
@@ -453,6 +480,10 @@ async def import_from_url(
 ):
     """Import a Lottie template from URL"""
     try:
+        # Validate URL
+        if not url.startswith(('http://', 'https://')):
+            raise HTTPException(status_code=400, detail="Invalid URL format")
+        
         # Process URL
         animation_data, manifest = await lottie_processor.process_url(url)
         
@@ -461,27 +492,59 @@ async def import_from_url(
         parsed_url = urlparse(url)
         filename = Path(parsed_url.path).name or "imported_animation.json"
         
+        # Clean filename
+        filename = "".join(c for c in filename if c.isalnum() or c in '.-_')
+        if not filename.endswith(('.json', '.lottie')):
+            filename += '.json'
+        
         # Save locally
         file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
         unique_filename = f"{file_hash}_{filename}"
         file_path = UPLOADS_DIR / unique_filename
         
-        async with aiofiles.open(file_path, 'w') as f:
-            await f.write(json.dumps(animation_data, indent=2))
+        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+            await f.write(json.dumps(animation_data, indent=2, ensure_ascii=False))
         
-        # Generate preview
-        preview_url = f"/uploads/previews/{unique_filename}.png"
+        # Generate thumbnail and preview video
+        from lottie_thumbnail_generator import lottie_thumbnail_generator
         
-        # Generate proper slug
+        # Create previews directory
+        previews_dir = UPLOADS_DIR / "previews"
+        previews_dir.mkdir(exist_ok=True)
+        
+        # Generate thumbnail
+        thumbnail_path = previews_dir / f"{unique_filename}_thumb.png"
+        await lottie_thumbnail_generator.generate_thumbnail(
+            animation_data, thumbnail_path, 300, 200
+        )
+        preview_url = f"/uploads/previews/{unique_filename}_thumb.png"
+        
+        # Generate preview video
+        preview_video_path = previews_dir / f"{unique_filename}_preview.mp4"
+        await lottie_thumbnail_generator.generate_preview_video(
+            animation_data, preview_video_path, 400, 300, 3.0
+        )
+        preview_video_url = f"/uploads/previews/{unique_filename}_preview.mp4"
+        
+        # Generate proper slug and title
         base_name = filename.replace('.json', '').replace('.lottie', '')
+        if not base_name or base_name == 'imported_animation':
+            base_name = f"Imported Animation {file_hash[:4]}"
+        
         safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
         safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
+        if not safe_slug:
+            safe_slug = f"animation-{file_hash[:4]}"
+        
+        # Extract dimensions from animation data
+        canvas_width = animation_data.get('w', 400)
+        canvas_height = animation_data.get('h', 400)
         
         # Create template record
         template_data = {
-            "title": filename.replace('.json', '').replace('.lottie', ''),
+            "title": base_name,
             "description": f"Imported from URL: {url}",
-            "tags": [],
+            "tags": ["imported", "lottie"],
             "source": "url",
             "license": "",
             "author": "",
@@ -493,8 +556,14 @@ async def import_from_url(
             # Add required fields for Template model compatibility
             "slug": safe_slug,
             "preview_image_url": preview_url,
+            "preview_video_url": preview_video_url,
             "editable_parameters_schema": {
-                "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
+                "canvas": {
+                    "width": canvas_width, 
+                    "height": canvas_height, 
+                    "background_color": "#FFFFFF", 
+                    "global_playback_speed": 1.0
+                },
                 "elements": []
             },
             "is_public": True
@@ -508,12 +577,15 @@ async def import_from_url(
             "name": template.title,
             "preview_url": template.preview_url,
             "manifest": template.manifest,
-            "file_url": template.file_url
+            "file_url": template.file_url,
+            "animation_data": animation_data  # Include for client-side preview generation
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"URL import error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to import from URL: {str(e)}")
 
 # Template CRUD Operations
 @api_router.get("/templates")
@@ -797,7 +869,8 @@ app.include_router(api_router)
 @api_router.post("/bulk-import/upload")
 async def bulk_import_upload(
     files: List[UploadFile] = File(...),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
 ):
     """Enhanced bulk upload with authentication"""
     results = []
@@ -845,10 +918,65 @@ async def bulk_import_upload(
 async def health_check():
     return {"status": "healthy"}
 
+# Test endpoint for Lottie import
+@api_router.post("/test/import-lottie")
+async def test_import_lottie(
+    url: str = Form(...)
+):
+    """Test endpoint to import Lottie files without authentication"""
+    try:
+        # Process URL
+        animation_data, manifest = await lottie_processor.process_url(url)
+        
+        # Generate test thumbnail
+        from lottie_thumbnail_generator import lottie_thumbnail_generator
+        
+        # Create test previews directory
+        test_previews_dir = UPLOADS_DIR / "test_previews"
+        test_previews_dir.mkdir(exist_ok=True)
+        
+        # Generate test thumbnail
+        test_filename = f"test_{hashlib.md5(url.encode()).hexdigest()[:8]}"
+        thumbnail_path = test_previews_dir / f"{test_filename}_thumb.png"
+        await lottie_thumbnail_generator.generate_thumbnail(
+            animation_data, thumbnail_path, 300, 200
+        )
+        
+        # Generate test preview video
+        preview_video_path = test_previews_dir / f"{test_filename}_preview.mp4"
+        await lottie_thumbnail_generator.generate_preview_video(
+            animation_data, preview_video_path, 400, 300, 3.0
+        )
+        
+        return {
+            "success": True,
+            "animation_data": {
+                "version": animation_data.get('v'),
+                "width": animation_data.get('w'),
+                "height": animation_data.get('h'),
+                "frame_rate": animation_data.get('fr'),
+                "duration": animation_data.get('op', 0) - animation_data.get('ip', 0),
+                "layers_count": len(animation_data.get('layers', []))
+            },
+            "manifest": manifest,
+            "thumbnail_url": f"/uploads/test_previews/{test_filename}_thumb.png",
+            "preview_video_url": f"/uploads/test_previews/{test_filename}_preview.mp4",
+            "message": "Lottie file processed successfully with thumbnails"
+        }
+        
+    except Exception as e:
+        logger.error(f"Test import error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to process Lottie file"
+        }
+
 @api_router.post("/bulk-import/create-templates")
 async def bulk_import_create_templates(
     import_data: Dict[str, Any],
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
 ):
     """Create templates from bulk import data"""
     items = import_data.get('items', [])

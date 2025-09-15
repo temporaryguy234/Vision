@@ -41,11 +41,20 @@ class LottieProcessor:
     async def process_url(self, url: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """Fetch and process a Lottie file from URL"""
         try:
-            # Download file
+            # Download file with proper headers
             session = await self.get_session()
-            async with session.get(url) as response:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            
+            async with session.get(url, headers=headers, timeout=30) as response:
                 if response.status != 200:
-                    raise ValueError(f"Failed to fetch URL: {response.status}")
+                    raise ValueError(f"Failed to fetch URL: {response.status} - {response.reason}")
                 
                 content = await response.read()
                 
@@ -55,10 +64,17 @@ class LottieProcessor:
                     animation_data = await self._extract_from_zip_content(content)
                 else:
                     # Process as JSON
-                    animation_data = json.loads(content.decode('utf-8'))
+                    try:
+                        animation_data = json.loads(content.decode('utf-8'))
+                    except json.JSONDecodeError as e:
+                        raise ValueError(f"Invalid JSON content: {str(e)}")
                 
                 if not animation_data:
                     raise ValueError("Could not extract animation data from URL")
+                
+                # Validate it's a proper Lottie file
+                if not self._validate_lottie_structure(animation_data):
+                    raise ValueError("File does not appear to be a valid Lottie animation")
                 
                 # Generate manifest
                 manifest = await self._generate_manifest(animation_data)
@@ -229,6 +245,24 @@ class LottieProcessor:
             return f"#{r:02x}{g:02x}{b:02x}"
         except:
             return "#000000"
+    
+    def _validate_lottie_structure(self, data: Dict[str, Any]) -> bool:
+        """Validate if the data is a proper Lottie animation"""
+        try:
+            # Check for required Lottie fields
+            required_fields = ['v', 'fr', 'ip', 'op', 'w', 'h', 'layers']
+            has_required = all(field in data for field in required_fields)
+            
+            # Check if layers is a list
+            layers_valid = isinstance(data.get('layers'), list)
+            
+            # Check for basic animation properties
+            has_dimensions = isinstance(data.get('w'), (int, float)) and isinstance(data.get('h'), (int, float))
+            has_frame_rate = isinstance(data.get('fr'), (int, float))
+            
+            return has_required and layers_valid and has_dimensions and has_frame_rate
+        except:
+            return False
 
 # Global instance
 lottie_processor = LottieProcessor()

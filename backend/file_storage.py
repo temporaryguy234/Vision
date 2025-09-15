@@ -400,14 +400,66 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
-            # For Lottie JSON, return a neutral placeholder to avoid broken UI
-            if asset_type == AssetType.LOTTIE_JSON:
-                return "/uploads/thumbnails/lottie_placeholder.svg"
+            # For Lottie JSON, generate actual thumbnail
+            elif asset_type == AssetType.LOTTIE_JSON:
+                from lottie_thumbnail_generator import lottie_thumbnail_generator
+                
+                # Extract Lottie data
+                lottie_data = await self._extract_lottie_data(file_path)
+                if lottie_data:
+                    # Generate thumbnail
+                    success = await lottie_thumbnail_generator.generate_thumbnail(
+                        lottie_data, thumbnail_path, 300, 200
+                    )
+                    if success and thumbnail_path.exists():
+                        return f"/uploads/thumbnails/{thumbnail_filename}"
+                
+                # Fallback to placeholder if generation fails
+                return "/uploads/thumbnails/lottie_placeholder.png"
+            
             # For other types, we might return a default thumbnail or None
             return None
             
         except Exception as e:
             print(f"Error generating thumbnail: {e}")
+            return None
+    
+    async def _extract_lottie_data(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """Extract Lottie animation data from file"""
+        try:
+            import zipfile
+            
+            # Check if it's a .lottie file (ZIP format)
+            if file_path.suffix.lower() == '.lottie':
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zip_file:
+                        # Look for data.json in the ZIP
+                        if 'data.json' in zip_file.namelist():
+                            with zip_file.open('data.json') as json_file:
+                                content = json_file.read().decode('utf-8')
+                                return json.loads(content)
+                        else:
+                            # Some .lottie files might have the JSON at root level
+                            json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                            if json_files:
+                                with zip_file.open(json_files[0]) as json_file:
+                                    content = json_file.read().decode('utf-8')
+                                    return json.loads(content)
+                except zipfile.BadZipFile:
+                    # If it's not a valid ZIP, treat as regular JSON
+                    async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                        return json.loads(content)
+            else:
+                # Regular JSON file
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    return json.loads(content)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error extracting Lottie data: {e}")
             return None
 
 # Global instance
