@@ -8,6 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
+import uuid
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
@@ -210,7 +211,7 @@ class AuthService:
 # Dependency to get current user
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db = Depends(get_database)
+    db = None  # Will be injected by server.py
 ) -> User:
     """Get current authenticated user"""
     auth_service = AuthService(db)
@@ -243,7 +244,7 @@ async def get_current_user(
 # Optional authentication (for public endpoints that can benefit from user context)
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    db = Depends(get_database)
+    db = None  # Will be injected by server.py
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise None"""
     if not credentials:
@@ -254,5 +255,4 @@ async def get_current_user_optional(
     except:
         return None
 
-import uuid
-from models import get_database
+# Note: get_database will be imported from server.py when needed

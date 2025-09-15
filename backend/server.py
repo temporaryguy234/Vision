@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import Request
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import errors as mongo_errors
 from contextlib import asynccontextmanager
@@ -17,6 +17,13 @@ import aiofiles
 import hashlib
 from datetime import datetime
 import httpx
+
+# Custom JSON encoder to handle datetime objects
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 # Import our models and processors
 from models import *
@@ -151,11 +158,11 @@ class FileCollection:
 
     async def _write(self, docs: List[Dict[str, Any]]):
         async with aiofiles.open(self.file_path, "w", encoding="utf-8") as f:
-            await f.write(json.dumps(docs, indent=2))
+            await f.write(json.dumps(docs, indent=2, cls=DateTimeEncoder))
 
     def _write_sync(self, docs: List[Dict[str, Any]]):
         with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(docs, indent=2))
+            f.write(json.dumps(docs, indent=2, cls=DateTimeEncoder))
 
 
 class FileDB:
@@ -244,6 +251,23 @@ def get_payment_service(db=Depends(get_database)):
 def get_export_service(db=Depends(get_database)):
     return ExportService(db, file_storage_manager)
 
+# Auth dependency wrappers with proper database injection
+async def get_current_user_with_db(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    db=Depends(get_database)
+) -> User:
+    """Get current authenticated user with database injection"""
+    from auth import get_current_user
+    return await get_current_user(credentials, db)
+
+async def get_current_user_optional_with_db(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db=Depends(get_database)
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise None, with database injection"""
+    from auth import get_current_user_optional
+    return await get_current_user_optional(credentials, db)
+
 # Authentication Routes
 @api_router.post("/auth/register")
 async def register(
@@ -289,7 +313,7 @@ async def google_auth(
     }
 
 @api_router.get("/auth/me")
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
+async def get_current_user_info(current_user: User = Depends(get_current_user_with_db)):
     """Get current user information"""
     return current_user
 
@@ -303,7 +327,7 @@ async def get_subscription_plans(
 
 @api_router.get("/subscriptions/current")
 async def get_current_subscription(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     subscription_service: SubscriptionService = Depends(get_subscription_service)
 ):
     """Get user's current subscription"""
@@ -316,7 +340,7 @@ async def get_current_subscription(
 @api_router.post("/subscriptions/upgrade")
 async def upgrade_subscription(
     tier: SubscriptionTier,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     subscription_service: SubscriptionService = Depends(get_subscription_service)
 ):
     """Upgrade user subscription"""
@@ -330,7 +354,7 @@ async def upgrade_subscription(
 @api_router.post("/payments/create-intent")
 async def create_payment_intent(
     payment_data: PaymentIntent,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     payment_service: PaymentService = Depends(get_payment_service)
 ):
     """Create payment intent"""
@@ -386,7 +410,7 @@ async def confirm_paypal_payment(
 async def upload_template(
     file: UploadFile = File(...),
     source: str = Form("upload"),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Upload and process a Lottie template file"""
@@ -444,7 +468,7 @@ async def upload_template(
         }
         
         template = Template(**template_data)
-        result = await db.templates.insert_one(template.model_dump())
+        result = await db.templates.insert_one(template.model_dump(mode='json'))
         
         return {
             "id": template.id,
@@ -461,7 +485,7 @@ async def upload_template(
 @api_router.post("/templates/import-url")
 async def import_from_url(
     url: str = Form(...),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Import a Lottie template from URL"""
@@ -535,7 +559,10 @@ async def import_from_url(
         }
         
         template = Template(**template_data)
-        result = await db.templates.insert_one(template.model_dump())
+        result = await db.templates.insert_one(template.model_dump(mode='json'))
+        
+        # Ensure animation_data doesn't contain datetime objects
+        safe_animation_data = json.loads(json.dumps(animation_data, cls=DateTimeEncoder))
         
         return {
             "id": template.id,
@@ -543,7 +570,7 @@ async def import_from_url(
             "preview_url": template.preview_url,
             "manifest": template.manifest,
             "file_url": template.file_url,
-            "animation_data": animation_data  # Include for client-side preview generation
+            "animation_data": safe_animation_data  # Include for client-side preview generation
         }
         
     except HTTPException:
@@ -558,7 +585,7 @@ async def get_templates(
     category: Optional[str] = None,
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Get templates with optional filtering"""
@@ -579,7 +606,7 @@ async def get_templates(
 @api_router.get("/templates/{template_id}")
 async def get_template(
     template_id: str, 
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Get a specific template by ID"""
@@ -599,7 +626,7 @@ async def get_template(
 @api_router.get("/templates/{template_id}/data")
 async def get_template_animation_data(
     template_id: str, 
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Get the original animation data for a template"""
@@ -689,7 +716,7 @@ async def upload_template_previews(
 async def save_revision(
     template_id: str,
     revision_data: TemplateRevisionCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     db=Depends(get_database)
 ):
     """Save a template edit revision"""
@@ -715,7 +742,7 @@ async def save_revision(
 @api_router.get("/templates/{template_id}/revisions")
 async def get_revisions(
     template_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     db=Depends(get_database)
 ):
     """Get template revisions for a user"""
@@ -737,7 +764,7 @@ async def get_revisions(
 async def process_prompt(
     template_id: str,
     prompt_data: Dict[str, Any],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     db=Depends(get_database)
 ):
     """Process natural language prompt and return JSON patches"""
@@ -775,7 +802,7 @@ async def create_export(
     current_state: Dict[str, Any],
     export_format: str = "MP4",
     resolution: str = "1080p",
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     subscription_service: SubscriptionService = Depends(get_subscription_service),
     export_service: ExportService = Depends(get_export_service)
 ):
@@ -807,7 +834,7 @@ async def create_export(
 
 @api_router.get("/exports")
 async def get_user_exports(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     export_service: ExportService = Depends(get_export_service)
 ):
     """Get user's exports"""
@@ -817,7 +844,7 @@ async def get_user_exports(
 @api_router.delete("/exports/{export_id}")
 async def delete_export(
     export_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_db),
     export_service: ExportService = Depends(get_export_service)
 ):
     """Delete an export"""
@@ -854,7 +881,7 @@ app.include_router(api_router)
 @api_router.post("/bulk-import/upload")
 async def bulk_import_upload(
     files: List[UploadFile] = File(...),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Enhanced bulk upload with authentication"""
@@ -962,7 +989,7 @@ async def test_import_lottie(
 @api_router.post("/bulk-import/create-templates")
 async def bulk_import_create_templates(
     import_data: Dict[str, Any],
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: Optional[User] = Depends(get_current_user_optional_with_db),
     db=Depends(get_database)
 ):
     """Create templates from bulk import data"""

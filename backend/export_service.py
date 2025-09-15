@@ -3,7 +3,7 @@ import asyncio
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from PIL import Image, ImageDraw, ImageFont
 import tempfile
 from datetime import datetime
