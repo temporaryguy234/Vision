@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -208,8 +208,12 @@ UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
 ).mkdir(exist_ok=True, parents=True)
 
 # Mount static files
+# Ensure exports directory exists before mounting
+EXPORTS_DIR = Path(os.environ.get('EXPORTS_DIR', "/app/exports"))
+EXPORTS_DIR.mkdir(exist_ok=True, parents=True)
+
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-app.mount("/exports", StaticFiles(directory="/app/exports"), name="exports")
+app.mount("/exports", StaticFiles(directory=str(EXPORTS_DIR)), name="exports")
 
 # API Router
 api_router = APIRouter(prefix="/api")
@@ -822,7 +826,8 @@ app.include_router(api_router)
 @api_router.post("/bulk-import/upload")
 async def bulk_import_upload(
     files: List[UploadFile] = File(...),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
 ):
     """Enhanced bulk upload with authentication"""
     if current_user is None:
