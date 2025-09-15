@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
 from datetime import datetime
@@ -186,7 +186,7 @@ class ChartElementParameters(BaseModel):
     scale: float = Field(default=1.0, ge=0.1, le=5.0, description="Scale multiplier")
     entrance_animation: Optional[EntranceAnimation] = None
 
-    @validator('series_colors')
+    @field_validator('series_colors')
     def validate_colors(cls, v):
         import re
         for color in v:
@@ -261,7 +261,7 @@ class Template(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    @validator('slug')
+    @field_validator('slug')
     def validate_slug(cls, v):
         import re
         if not re.match(r"^[a-z0-9-]+$", v):
@@ -305,7 +305,7 @@ class BrandKit(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    @validator('colors')
+    @field_validator('colors')
     def validate_colors(cls, v):
         import re
         for color in v:
