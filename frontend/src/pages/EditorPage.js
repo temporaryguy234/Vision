@@ -394,7 +394,32 @@ const EditorPage = () => {
       
       // Handle different types of property changes
       if (property.includes('color')) {
-        // Color changes
+        // Use bulletproof color changing
+        try {
+          // Send to backend for bulletproof color change
+          const response = await fetch('/api/bulletproof/change-color', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              animation_data: updatedAnim,
+              target_color: value,
+              color_type: property.includes('stroke') ? 'stroke' : 
+                         property.includes('background') ? 'background' : 'fill'
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            setAnimationData(result.animation_data);
+            return; // Exit early if backend processing succeeded
+          }
+        } catch (error) {
+          console.warn('Backend color change failed, using frontend fallback:', error);
+        }
+        
+        // Frontend fallback - enhanced color changing
         const layers = updatedAnim.layers || [];
         for (const layer of layers) {
           const shapes = layer.shapes || [];

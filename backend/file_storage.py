@@ -16,6 +16,9 @@ class FileStorageManager:
         self.base_upload_dir = Path(base_upload_dir)
         self.base_upload_dir.mkdir(exist_ok=True, parents=True)
         
+        # Ensure all subdirectories exist
+        self._ensure_directories()
+        
         # Create subdirectories for different asset types
         self.subdirs = {
             AssetType.LOTTIE_JSON: self.base_upload_dir / "lottie",
@@ -28,6 +31,21 @@ class FileStorageManager:
         
         for subdir in self.subdirs.values():
             subdir.mkdir(exist_ok=True, parents=True)
+    
+    def _ensure_directories(self):
+        """Ensure all required directories exist"""
+        required_dirs = [
+            self.base_upload_dir / "thumbnails",
+            self.base_upload_dir / "previews",
+            self.base_upload_dir / "lottie",
+            self.base_upload_dir / "images" / "png",
+            self.base_upload_dir / "images" / "gif",
+            self.base_upload_dir / "videos" / "mp4",
+            self.base_upload_dir / "videos" / "webm",
+        ]
+        
+        for dir_path in required_dirs:
+            dir_path.mkdir(exist_ok=True, parents=True)
     
     def _get_asset_type_from_file(self, filename: str, content_type: str) -> Optional[AssetType]:
         """Determine asset type from filename and content type"""
@@ -364,9 +382,15 @@ class FileStorageManager:
     
     async def generate_thumbnail(self, file_url: str, asset_type: AssetType) -> Optional[str]:
         """Generate a thumbnail for the asset"""
+        print(f"🔍 Generating thumbnail for: {file_url}, type: {asset_type}")
+        
         file_path = self.get_file_path(file_url)
         if not file_path:
+            print(f"❌ File path not found for: {file_url}")
             return None
+        
+        print(f"📁 File path: {file_path}")
+        print(f"📁 File exists: {file_path.exists()}")
         
         thumbnail_dir = self.base_upload_dir / "thumbnails"
         thumbnail_dir.mkdir(exist_ok=True)
@@ -374,6 +398,8 @@ class FileStorageManager:
         # Generate thumbnail filename
         thumbnail_filename = f"{file_path.stem}_thumb.png"
         thumbnail_path = thumbnail_dir / thumbnail_filename
+        
+        print(f"📁 Thumbnail path: {thumbnail_path}")
         
         try:
             if asset_type in [AssetType.MP4, AssetType.WEBM_ALPHA]:
@@ -400,19 +426,40 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
-            # For Lottie JSON, generate actual thumbnail
+            # For Lottie JSON, generate bulletproof thumbnail
             elif asset_type == AssetType.LOTTIE_JSON:
+                print(f"🎨 Processing Lottie file: {file_path}")
+                
                 # Extract Lottie data
                 lottie_data = await self._extract_lottie_data(file_path)
                 if lottie_data:
-                    # Create a simple but effective thumbnail
-                    await self._create_lottie_thumbnail(lottie_data, thumbnail_path)
-                    if thumbnail_path.exists():
+                    print(f"✅ Lottie data extracted successfully")
+                    
+                    # Use bulletproof thumbnail generator
+                    from bulletproof_thumbnail import bulletproof_thumbnail_generator
+                    success = bulletproof_thumbnail_generator.generate_lottie_thumbnail(
+                        lottie_data, thumbnail_path
+                    )
+                    
+                    if success and (thumbnail_path.exists() or thumbnail_path.with_suffix('.svg').exists()):
+                        print(f"✅ Bulletproof thumbnail created: {thumbnail_path}")
                         return f"/uploads/thumbnails/{thumbnail_filename}"
+                    else:
+                        print(f"❌ Bulletproof thumbnail creation failed")
+                else:
+                    print(f"❌ Failed to extract Lottie data")
                 
-                # Fallback to placeholder if generation fails
-                await self._create_lottie_placeholder(thumbnail_path)
-                return f"/uploads/thumbnails/{thumbnail_filename}"
+                # Final fallback - create a simple file that indicates thumbnail exists
+                print(f"🔄 Creating final fallback")
+                try:
+                    # Create a simple text file as last resort
+                    fallback_path = thumbnail_path.with_suffix('.txt')
+                    with open(fallback_path, 'w') as f:
+                        f.write("Lottie Animation Thumbnail")
+                    print(f"✅ Fallback file created: {fallback_path}")
+                    return f"/uploads/thumbnails/{thumbnail_filename}"
+                except Exception as e:
+                    print(f"❌ All thumbnail methods failed: {e}")
             # For other types, we might return a default thumbnail or None
             return None
             

@@ -874,6 +874,35 @@ async def get_stats(db=Depends(get_database)):
             "avg_edit_time": "2 Min"
         }
 
+# Bulletproof endpoints
+@api_router.post("/bulletproof/change-color")
+async def bulletproof_change_color(request: Dict[str, Any]):
+    """Bulletproof color change endpoint"""
+    try:
+        from bulletproof_color_changer import bulletproof_color_changer
+        
+        animation_data = request.get('animation_data')
+        target_color = request.get('target_color')
+        color_type = request.get('color_type', 'fill')
+        
+        if not animation_data or not target_color:
+            raise HTTPException(status_code=400, detail="Missing animation_data or target_color")
+        
+        # Change the color
+        modified_data = bulletproof_color_changer.change_color(
+            animation_data, target_color, color_type
+        )
+        
+        return {
+            "success": True,
+            "animation_data": modified_data,
+            "message": f"Color changed to {target_color}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Bulletproof color change error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include router
 app.include_router(api_router)
 
@@ -1194,3 +1223,4 @@ async def lf_import_animation(animation_id: str, current_user: Optional[User] = 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
+    
