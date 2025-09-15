@@ -39,8 +39,8 @@ const UploadPage = () => {
   const handleFiles = async (files) => {
     setIsProcessing(true);
     
-    const validFiles = files.filter(file => 
-      file.name.endsWith('.json') || file.name.endsWith('.lottie')
+    const validFiles = files.filter(file =>
+      file.name.toLowerCase().endsWith('.json') || file.name.toLowerCase().endsWith('.lottie')
     );
 
     if (validFiles.length === 0) {
@@ -69,7 +69,7 @@ const UploadPage = () => {
 
   const handleUrlImport = async () => {
     if (!urlInput.trim()) return;
-    
+
     setIsProcessing(true);
     try {
       const result = await apiService.importFromUrl(urlInput);
@@ -105,6 +105,7 @@ const UploadPage = () => {
       setUrlInput('');
     } catch (error) {
       console.error('URL import error:', error);
+      alert('Import failed. Please try again.');
       setUploadedFiles(prev => [...prev, {
         id: Date.now() + Math.random(),
         name: urlInput,
@@ -119,8 +120,13 @@ const UploadPage = () => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('source', source);
-    
-    const result = await apiService.uploadTemplate(formData);
+    let result;
+    try {
+      result = await apiService.uploadTemplate(formData);
+    } catch (error) {
+      alert('Upload failed. Please try again.');
+      throw error;
+    }
 
     // Generate previews client-side: last-frame PNG + 2.5s WebM
     try {

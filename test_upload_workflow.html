@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Workflow Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .loading { background-color: #d1ecf1; color: #0c5460; }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .preview-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .preview-item {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .preview-item img, .preview-item video {
+            max-width: 200px;
+            max-height: 150px;
+        }
+        .lottie-preview {
+            width: 200px;
+            height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Workflow Test</h1>
+    
+    <div class="test-container">
+        <h2>1. Lottie-Datei hochladen</h2>
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p>Klicken Sie hier, um eine Lottie-Datei (.json oder .lottie) hochzuladen</p>
+            <input type="file" id="fileInput" accept=".json,.lottie" style="display: none;">
+        </div>
+        <div id="uploadStatus" class="status loading" style="display: none;">Lade...</div>
+    </div>
+
+    <div class="test-container">
+        <h2>2. Upload-Ergebnis</h2>
+        <div id="uploadResult"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>3. Previews</h2>
+        <div class="preview-container">
+            <div class="preview-item">
+                <h3>Thumbnail</h3>
+                <div id="thumbnailPreview"></div>
+            </div>
+            <div class="preview-item">
+                <h3>Preview Video</h3>
+                <div id="videoPreview"></div>
+            </div>
+            <div class="preview-item">
+                <h3>Lottie Animation</h3>
+                <div id="lottiePreview" class="lottie-preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>4. Editor-Test</h2>
+        <button onclick="testEditor()">Editor öffnen</button>
+        <div id="editorStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <script src="https://unpkg.com/lottie-react@2.4.0/dist/lottie-react.min.js"></script>
+    <script>
+        const backendBase = 'http://localhost:8001';
+        let uploadedTemplate = null;
+
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('uploadStatus');
+            const resultEl = document.getElementById('uploadResult');
+            
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Lade Datei hoch...';
+            statusEl.className = 'status loading';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('source', 'test_upload');
+
+                const response = await fetch(`${backendBase}/api/templates/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload fehlgeschlagen: ${response.status}`);
+                }
+
+                uploadedTemplate = await response.json();
+                
+                statusEl.textContent = 'Upload erfolgreich!';
+                statusEl.className = 'status success';
+                
+                resultEl.innerHTML = `
+                    <h3>Template erstellt:</h3>
+                    <p><strong>ID:</strong> ${uploadedTemplate.id}</p>
+                    <p><strong>Titel:</strong> ${uploadedTemplate.title}</p>
+                    <p><strong>Datei:</strong> ${uploadedTemplate.file_url}</p>
+                    <p><strong>Thumbnail:</strong> ${uploadedTemplate.preview_url}</p>
+                    <p><strong>Preview Video:</strong> ${uploadedTemplate.preview_video_url || 'Nicht verfügbar'}</p>
+                `;
+
+                // Previews laden
+                loadPreviews(uploadedTemplate);
+                
+            } catch (error) {
+                statusEl.textContent = `Fehler: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        });
+
+        async function loadPreviews(template) {
+            // Thumbnail laden
+            if (template.preview_url) {
+                const thumbnailEl = document.getElementById('thumbnailPreview');
+                thumbnailEl.innerHTML = `<img src="${backendBase}${template.preview_url}" alt="Thumbnail">`;
+            }
+
+            // Preview Video laden
+            if (template.preview_video_url) {
+                const videoEl = document.getElementById('videoPreview');
+                videoEl.innerHTML = `<video controls><source src="${backendBase}${template.preview_video_url}" type="video/webm"></video>`;
+            } else {
+                document.getElementById('videoPreview').innerHTML = '<p>Kein Preview Video verfügbar</p>';
+            }
+
+            // Lottie Animation laden
+            try {
+                const lottieEl = document.getElementById('lottiePreview');
+                const response = await fetch(`${backendBase}/api/lottie/${template.file_url.replace('/uploads/', '')}`);
+                if (response.ok) {
+                    const animationData = await response.json();
+                    lottie.loadAnimation({
+                        container: lottieEl,
+                        renderer: 'svg',
+                        loop: true,
+                        autoplay: true,
+                        animationData: animationData
+                    });
+                } else {
+                    lottieEl.innerHTML = '<p>Lottie-Animation konnte nicht geladen werden</p>';
+                }
+            } catch (error) {
+                document.getElementById('lottiePreview').innerHTML = `<p>Fehler beim Laden der Animation: ${error.message}</p>`;
+            }
+        }
+
+        function testEditor() {
+            if (!uploadedTemplate) {
+                alert('Bitte laden Sie zuerst eine Lottie-Datei hoch!');
+                return;
+            }
+
+            const editorStatusEl = document.getElementById('editorStatus');
+            editorStatusEl.style.display = 'block';
+            editorStatusEl.textContent = 'Editor wird geöffnet...';
+            editorStatusEl.className = 'status loading';
+
+            // Editor in neuem Tab öffnen
+            const editorUrl = `http://localhost:3000/editor/${uploadedTemplate.id}`;
+            window.open(editorUrl, '_blank');
+            
+            editorStatusEl.textContent = 'Editor wurde geöffnet!';
+            editorStatusEl.className = 'status success';
+        }
+    </script>
+</body>
+</html>

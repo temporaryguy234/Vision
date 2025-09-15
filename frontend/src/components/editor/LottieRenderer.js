@@ -39,7 +39,7 @@ const LottieRenderer = ({
   const [error, setError] = React.useState(null);
 
   useEffect(() => {
-    const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+    const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
     // If external data is provided, use it directly
     if (externalAnimationData) {
@@ -67,14 +67,30 @@ const LottieRenderer = ({
           const response = await fetch(`${backendBase}/api/lottiefiles/animation/${animationId}/data`);
           if (!response.ok) throw new Error(`Failed to load embedded animation: ${response.status}`);
           data = await response.json();
-        } else if (sourceUrl.startsWith('/uploads/')) {
-          const response = await fetch(`${backendBase}${sourceUrl}`);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
         } else {
-          const response = await fetch(sourceUrl);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
+          let resolvedUrl = sourceUrl;
+          if (resolvedUrl.startsWith('/uploads/')) {
+            // Use the new direct Lottie endpoint for uploads
+            const filePath = resolvedUrl.replace('/uploads/', '');
+            const lottieUrl = `${backendBase}/api/lottie/${filePath}`;
+            const response = await fetch(lottieUrl);
+            if (!response.ok) throw new Error(`Failed to load Lottie file: ${response.status}`);
+            data = await response.json();
+          } else {
+            // For external URLs, try direct fetch first, then proxy
+            try {
+              const response = await fetch(resolvedUrl);
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              data = await response.json();
+            } catch (error) {
+              console.warn('Direct fetch failed, trying proxy:', error.message);
+              // Fallback to proxy for external URLs
+              const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
+              const proxyResp = await fetch(proxyUrl);
+              if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
+              data = await proxyResp.json();
+            }
+          }
         }
 
         setAnimationData(data);

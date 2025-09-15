@@ -16,6 +16,7 @@ from pathlib import Path
 import aiofiles
 import hashlib
 from datetime import datetime
+import httpx
 
 # Import our models and processors
 from models import *
@@ -26,6 +27,7 @@ from subscription import SubscriptionService, SubscriptionTier
 from payments import PaymentService, PaymentIntent
 from ai_service import ai_service, AIPromptRequest
 from export_service import ExportService
+from lottiefiles import lottiefiles_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -384,52 +386,36 @@ async def confirm_paypal_payment(
 async def upload_template(
     file: UploadFile = File(...),
     source: str = Form("upload"),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db=Depends(get_database)
 ):
     """Upload and process a Lottie template file"""
     try:
         # Validate file type
-        if not (file.filename.endswith('.json') or file.filename.endswith('.lottie')):
+        filename_lower = file.filename.lower()
+        if not (filename_lower.endswith('.json') or filename_lower.endswith('.lottie')):
             raise HTTPException(status_code=400, detail="Only .json and .lottie files are supported")
         
-        # Generate unique filename
-        file_hash = hashlib.md5(file.filename.encode()).hexdigest()[:8]
+        # Read file content and generate a unique filename based on its hash
+        content = await file.read()
+        file_hash = hashlib.md5(content).hexdigest()[:8]
         safe_name = "".join(c for c in file.filename if c.isalnum() or c in '.-_')
         unique_filename = f"{file_hash}_{safe_name}"
         file_path = UPLOADS_DIR / unique_filename
-        
+
         # Save file
         async with aiofiles.open(file_path, 'wb') as f:
-            content = await file.read()
             await f.write(content)
         
         # Process file
         animation_data, manifest = await lottie_processor.process_file(file_path)
         
-        # Generate thumbnail and preview video
-        from lottie_thumbnail_generator import lottie_thumbnail_generator
-        
-        # Create previews directory
-        previews_dir = UPLOADS_DIR / "previews"
-        previews_dir.mkdir(exist_ok=True)
-        
-        # Generate thumbnail
-        thumbnail_path = previews_dir / f"{unique_filename}_thumb.png"
-        await lottie_thumbnail_generator.generate_thumbnail(
-            animation_data, thumbnail_path, 300, 200
-        )
-        preview_url = f"/uploads/previews/{unique_filename}_thumb.png"
-        
-        # Generate preview video
-        preview_video_path = previews_dir / f"{unique_filename}_preview.mp4"
-        await lottie_thumbnail_generator.generate_preview_video(
-            animation_data, preview_video_path, 400, 300, 3.0
-        )
-        preview_video_url = f"/uploads/previews/{unique_filename}_preview.mp4"
+        # Generate preview thumbnail and video
+        preview_url = await file_storage_manager.generate_thumbnail(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
         
         # Generate proper slug
-        base_name = file.filename.replace('.json', '').replace('.lottie', '')
+        base_name = filename_lower.replace('.json', '').replace('.lottie', '')
         safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
         safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
         
@@ -441,7 +427,7 @@ async def upload_template(
             "source": source,
             "license": "",
             "author": "",
-            "creator_id": current_user.id,
+            "creator_id": current_user.id if current_user else "anonymous",
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
@@ -475,7 +461,7 @@ async def upload_template(
 @api_router.post("/templates/import-url")
 async def import_from_url(
     url: str = Form(...),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db=Depends(get_database)
 ):
     """Import a Lottie template from URL"""
@@ -491,46 +477,25 @@ async def import_from_url(
         from urllib.parse import urlparse
         parsed_url = urlparse(url)
         filename = Path(parsed_url.path).name or "imported_animation.json"
+        filename_lower = filename.lower()
         
-        # Clean filename
-        filename = "".join(c for c in filename if c.isalnum() or c in '.-_')
-        if not filename.endswith(('.json', '.lottie')):
-            filename += '.json'
-        
-        # Save locally
-        file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+        # Save locally using a content hash to avoid name collisions
+        content = json.dumps(animation_data, sort_keys=True, indent=2)
+        file_hash = hashlib.md5(content.encode()).hexdigest()[:8]
         unique_filename = f"{file_hash}_{filename}"
         file_path = UPLOADS_DIR / unique_filename
+
+        async with aiofiles.open(file_path, 'w') as f:
+            await f.write(content)
         
-        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(animation_data, indent=2, ensure_ascii=False))
+        # Generate preview thumbnail and video
+        preview_url = await file_storage_manager.generate_thumbnail(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
         
-        # Generate thumbnail and preview video
-        from lottie_thumbnail_generator import lottie_thumbnail_generator
-        
-        # Create previews directory
-        previews_dir = UPLOADS_DIR / "previews"
-        previews_dir.mkdir(exist_ok=True)
-        
-        # Generate thumbnail
-        thumbnail_path = previews_dir / f"{unique_filename}_thumb.png"
-        await lottie_thumbnail_generator.generate_thumbnail(
-            animation_data, thumbnail_path, 300, 200
-        )
-        preview_url = f"/uploads/previews/{unique_filename}_thumb.png"
-        
-        # Generate preview video
-        preview_video_path = previews_dir / f"{unique_filename}_preview.mp4"
-        await lottie_thumbnail_generator.generate_preview_video(
-            animation_data, preview_video_path, 400, 300, 3.0
-        )
-        preview_video_url = f"/uploads/previews/{unique_filename}_preview.mp4"
-        
-        # Generate proper slug and title
-        base_name = filename.replace('.json', '').replace('.lottie', '')
+        # Generate proper slug
+        base_name = filename_lower.replace('.json', '').replace('.lottie', '')
         if not base_name or base_name == 'imported_animation':
             base_name = f"Imported Animation {file_hash[:4]}"
-        
         safe_slug = base_name.lower().replace(' ', '-').replace('_', '-')
         safe_slug = ''.join(c for c in safe_slug if c.isalnum() or c == '-')
         if not safe_slug:
@@ -548,7 +513,7 @@ async def import_from_url(
             "source": "url",
             "license": "",
             "author": "",
-            "creator_id": current_user.id,
+            "creator_id": current_user.id if current_user else "anonymous",
             "file_url": f"/uploads/{unique_filename}",
             "preview_url": preview_url,
             "manifest": manifest,
@@ -862,6 +827,26 @@ async def delete_export(
     else:
         raise HTTPException(status_code=404, detail="Export not found")
 
+# Simple stats endpoint for ExplorePage
+@api_router.get("/stats")
+async def get_stats(db=Depends(get_database)):
+    try:
+        total_templates = await db.templates.count_documents({})
+        # Placeholder values for now
+        return {
+            "active_creators": "10K+",
+            "templates": f"{total_templates}",
+            "time_saved": "95%",
+            "avg_edit_time": "2 Min"
+        }
+    except Exception:
+        return {
+            "active_creators": "10K+",
+            "templates": "500+",
+            "time_saved": "95%",
+            "avg_edit_time": "2 Min"
+        }
+
 # Include router
 app.include_router(api_router)
 
@@ -873,6 +858,8 @@ async def bulk_import_upload(
     db=Depends(get_database)
 ):
     """Enhanced bulk upload with authentication"""
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Authentication required to upload files")
     results = []
     
     for file in files:
@@ -1036,6 +1023,146 @@ async def bulk_import_create_templates(
             "failed": len(errors),
             "total": len(items)
         }
+    }
+
+# Lightweight proxy to fetch external JSON (e.g., Lottie JSON) to avoid CORS issues in the browser
+@api_router.get("/proxy/fetch-json")
+async def proxy_fetch_json(url: str = Query(..., description="HTTP(S) URL to fetch JSON from")):
+    try:
+        # Basic validation
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise HTTPException(status_code=400, detail="Only http(s) URLs are allowed")
+
+        timeout = httpx.Timeout(15.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers={
+            "User-Agent": "MotionEdit/1.0 (+https://example.com)",
+            "Accept": "application/json, text/plain;q=0.9, */*;q=0.8"
+        }) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Upstream error: {resp.status_code}")
+
+            # Attempt to parse JSON to ensure we return valid JSON
+            try:
+                data = resp.json()
+            except Exception:
+                # Some hosts return text/plain with JSON content, attempt manual parse
+                try:
+                    data = httpx.Response(200, content=resp.content).json()
+                except Exception:
+                    raise HTTPException(status_code=400, detail="Response is not valid JSON")
+
+            return data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Proxy fetch error for {url}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Direct endpoint for serving Lottie files from uploads directory
+@api_router.get("/lottie/{file_path:path}")
+async def serve_lottie_file(file_path: str):
+    """Serve Lottie files directly from uploads directory with proper CORS headers"""
+    try:
+        # Security: ensure the file is within uploads directory
+        full_path = UPLOADS_DIR / file_path
+        if not full_path.resolve().is_relative_to(UPLOADS_DIR.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Read and return the file content
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Try to parse as JSON to validate it's a valid Lottie file
+        try:
+            json_data = json.loads(content)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON file")
+        
+        return json_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving Lottie file {file_path}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- LottieFiles curated browsing/import endpoints ---
+@api_router.get("/lottiefiles/animations")
+async def lf_search_animations(query: Optional[str] = None, category: Optional[str] = None, limit: int = 20):
+    return await lottiefiles_service.search_animations(query=query, category=category, limit=limit)
+
+@api_router.get("/lottiefiles/categories")
+async def lf_categories():
+    return await lottiefiles_service.get_categories()
+
+@api_router.get("/lottiefiles/animation/{animation_id}/data")
+async def lf_animation_data(animation_id: str):
+    details = await lottiefiles_service.get_animation_details(animation_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Animation not found")
+    data = await lottiefiles_service.download_animation(details.file_url)
+    if not data:
+        raise HTTPException(status_code=404, detail="Animation data not available")
+    return data
+
+@api_router.post("/lottiefiles/animation/{animation_id}/import")
+async def lf_import_animation(animation_id: str, current_user: Optional[User] = Depends(get_current_user_optional), db=Depends(get_database)):
+    details = await lottiefiles_service.get_animation_details(animation_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Animation not found")
+
+    # Get animation data
+    data = await lottiefiles_service.download_animation(details.file_url)
+    if not data:
+        raise HTTPException(status_code=404, detail="Animation data not available")
+
+    # Save locally using a content hash
+    content = json.dumps(data, sort_keys=True)
+    file_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+    safe_name = f"{animation_id}.json"
+    unique_filename = f"{file_hash}_{safe_name}"
+    file_path = UPLOADS_DIR / unique_filename
+
+    async with aiofiles.open(file_path, 'w') as f:
+        await f.write(json.dumps(data))
+
+    # Create template
+    preview_url = f"/uploads/previews/{unique_filename}.png"
+    template_data = {
+        "title": details.name,
+        "description": details.description or "Imported from curated LottieFiles",
+        "tags": details.tags,
+        "source": "lottiefiles",
+        "license": "",
+        "author": "",
+        "creator_id": current_user.id if current_user else "anonymous",
+        "file_url": f"/uploads/{unique_filename}",
+        "preview_url": preview_url,
+        "manifest": await lottie_processor._generate_manifest(data),
+        "category": details.category,
+        "slug": details.name.lower().replace(' ', '-'),
+        "preview_image_url": preview_url,
+        "preview_video_url": "",
+        "editable_parameters_schema": {
+            "canvas": {"width": details.dimensions.get("width", 400), "height": details.dimensions.get("height", 400), "background_color": "#FFFFFF", "global_playback_speed": 1.0},
+            "elements": []
+        },
+        "is_public": True
+    }
+
+    template = Template(**template_data)
+    await db.templates.insert_one(template.model_dump())
+
+    return {
+        "template_id": template.id,
+        "template_title": template.title,
+        "category": template.category,
+        "file_url": template.file_url
     }
 if __name__ == "__main__":
     import uvicorn
