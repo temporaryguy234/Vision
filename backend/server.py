@@ -400,9 +400,9 @@ async def upload_template(
         # Process file
         animation_data, manifest = await lottie_processor.process_file(file_path)
         
-        # Generate preview (placeholder for now)
-        preview_url = f"/uploads/previews/{unique_filename}.png"
-        preview_video_url = ""
+        # Generate preview thumbnail and video
+        preview_url = await file_storage_manager.generate_thumbnail(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
         
         # Generate proper slug
         base_name = filename_lower.replace('.json', '').replace('.lottie', '')
@@ -970,6 +970,37 @@ async def proxy_fetch_json(url: str = Query(..., description="HTTP(S) URL to fet
         raise
     except Exception as e:
         logger.error(f"Proxy fetch error for {url}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Direct endpoint for serving Lottie files from uploads directory
+@api_router.get("/lottie/{file_path:path}")
+async def serve_lottie_file(file_path: str):
+    """Serve Lottie files directly from uploads directory with proper CORS headers"""
+    try:
+        # Security: ensure the file is within uploads directory
+        full_path = UPLOADS_DIR / file_path
+        if not full_path.resolve().is_relative_to(UPLOADS_DIR.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Read and return the file content
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Try to parse as JSON to validate it's a valid Lottie file
+        try:
+            json_data = json.loads(content)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON file")
+        
+        return json_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving Lottie file {file_path}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- LottieFiles curated browsing/import endpoints ---
