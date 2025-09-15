@@ -182,49 +182,79 @@ const EditorPage = () => {
     try {
       setPromptLoading(true);
       
-      const response = await apiService.post(`/templates/${templateId}/prompt`, {
-        prompt: promptText,
-        state: currentState,
-        manifest: template?.manifest || {}
-      });
-
-      // Apply patches from AI response
-      if (response.patches && response.patches.length > 0) {
-        const newState = { ...currentState };
-        response.patches.forEach(patch => {
-          if (patch.op === 'replace') {
-            const pathParts = patch.path.split('/').filter(p => p);
-            if (pathParts.length > 0) newState[pathParts.join('.')] = patch.value;
+      // Simple prompt processing for common commands
+      const prompt = promptText.toLowerCase().trim();
+      let changesApplied = 0;
+      
+      // Handle common prompt commands
+      if (prompt.includes('faster') || prompt.includes('speed')) {
+        const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
+        if (speedMatch) {
+          const newSpeed = parseFloat(speedMatch[1]);
+          if (newSpeed > 0 && newSpeed <= 5) {
+            setSpeed(newSpeed);
+            setCurrentState(prev => ({ ...prev, speed: newSpeed }));
+            setEditorState(prev => ({
+              ...prev,
+              canvas: {
+                ...prev.canvas,
+                global_playback_speed: newSpeed
+              }
+            }));
+            changesApplied++;
           }
-        });
-        setCurrentState(newState);
-
-        // Apply directly to animation JSON
-        const updatedAnim = applyPatchesToAnimation(response.patches, template?.manifest || {}, animationData);
-        if (updatedAnim) setAnimationData(updatedAnim);
-        
-        // Update editor state with new values
-        const newEditorState = { ...editorState };
-        response.patches.forEach(patch => {
-          if (patch.op === 'replace' && patch.path.includes('elements/')) {
-            const pathParts = patch.path.split('/');
-            const elementId = pathParts[1];
-            const property = pathParts[2];
-            if (elementId && property) {
-              newEditorState.elements[elementId] = {
-                ...newEditorState.elements[elementId],
-                [property]: patch.value
-              };
-            }
+        }
+      }
+      
+      if (prompt.includes('slower')) {
+        const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
+        if (speedMatch) {
+          const newSpeed = parseFloat(speedMatch[1]);
+          if (newSpeed > 0 && newSpeed <= 5) {
+            setSpeed(newSpeed);
+            setCurrentState(prev => ({ ...prev, speed: newSpeed }));
+            setEditorState(prev => ({
+              ...prev,
+              canvas: {
+                ...prev.canvas,
+                global_playback_speed: newSpeed
+              }
+            }));
+            changesApplied++;
           }
-        });
-        setEditorState(newEditorState);
-        
-        // Clear prompt
-        setPromptText('');
-        
-        // Show success
-        alert(`Applied ${response.patches.length} changes from prompt`);
+        }
+      }
+      
+      if (prompt.includes('color') || prompt.includes('colour')) {
+        const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
+        if (colorMatch) {
+          const color = '#' + colorMatch[1];
+          // Apply color to first available element
+          const elements = template?.editable_parameters_schema?.elements || template?.manifest?.elements || [];
+          if (elements.length > 0) {
+            const firstElement = elements[0];
+            handlePropertyChange(firstElement.id, 'color', color);
+            changesApplied++;
+          }
+        }
+      }
+      
+      if (prompt.includes('background')) {
+        const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
+        if (colorMatch) {
+          const color = '#' + colorMatch[1];
+          handleCanvasChange('background_color', color);
+          changesApplied++;
+        }
+      }
+      
+      // Clear prompt
+      setPromptText('');
+      
+      if (changesApplied > 0) {
+        alert(`Applied ${changesApplied} changes from prompt`);
+      } else {
+        alert('Prompt processed but no changes were made. Try: "make it faster", "change color to #FF0000", "set background to #000000"');
       }
 
     } catch (err) {
@@ -292,8 +322,34 @@ const EditorPage = () => {
     // Apply changes to animation data if it's a color change
     if (property.includes('color') && animationData) {
       const updatedAnim = JSON.parse(JSON.stringify(animationData));
+      
       // Find and update the color in the animation data
       // This is a simplified approach - in a real implementation, you'd need to traverse the Lottie structure
+      const layers = updatedAnim.layers || [];
+      for (const layer of layers) {
+        const shapes = layer.shapes || [];
+        for (const shape of shapes) {
+          if (shape.ty === 'fl' && shape.c && shape.c.k) { // Fill color
+            // Convert hex color to RGB values (0-1 range)
+            if (value.startsWith('#')) {
+              const hex = value.slice(1);
+              const r = parseInt(hex.substr(0, 2), 16) / 255;
+              const g = parseInt(hex.substr(2, 2), 16) / 255;
+              const b = parseInt(hex.substr(4, 2), 16) / 255;
+              shape.c.k = [r, g, b, 1];
+            }
+          } else if (shape.ty === 'st' && shape.c && shape.c.k) { // Stroke color
+            if (value.startsWith('#')) {
+              const hex = value.slice(1);
+              const r = parseInt(hex.substr(0, 2), 16) / 255;
+              const g = parseInt(hex.substr(2, 2), 16) / 255;
+              const b = parseInt(hex.substr(4, 2), 16) / 255;
+              shape.c.k = [r, g, b, 1];
+            }
+          }
+        }
+      }
+      
       setAnimationData(updatedAnim);
     }
   };

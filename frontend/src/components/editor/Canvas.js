@@ -271,7 +271,7 @@ const Canvas = forwardRef(({
             </div>
           )}
           
-          {/* Render Editable Elements */}
+          {/* Render Editable Elements Overlay */}
           {(template.editable_parameters_schema?.elements || template.manifest?.elements || []).map(element => (
             <ElementRenderer
               key={element.id}

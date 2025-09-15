@@ -402,17 +402,12 @@ class FileStorageManager:
             
             # For Lottie JSON, generate actual thumbnail
             elif asset_type == AssetType.LOTTIE_JSON:
-                from lottie_thumbnail_generator import LottieThumbnailGenerator
-                
                 # Extract Lottie data
                 lottie_data = await self._extract_lottie_data(file_path)
                 if lottie_data:
-                    # Generate thumbnail
-                    generator = LottieThumbnailGenerator()
-                    success = await generator.generate_thumbnail(
-                        lottie_data, thumbnail_path, 300, 200
-                    )
-                    if success and thumbnail_path.exists():
+                    # Create a simple but effective thumbnail
+                    await self._create_lottie_thumbnail(lottie_data, thumbnail_path)
+                    if thumbnail_path.exists():
                         return f"/uploads/thumbnails/{thumbnail_filename}"
                 
                 # Fallback to placeholder if generation fails
@@ -576,6 +571,86 @@ class FileStorageManager:
             return None
         except:
             return None
+
+    async def _create_lottie_thumbnail(self, lottie_data: Dict[str, Any], thumbnail_path: Path):
+        """Create a simple but effective thumbnail for Lottie files"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Get animation dimensions
+            anim_width = lottie_data.get('w', 400)
+            anim_height = lottie_data.get('h', 400)
+            frame_rate = lottie_data.get('fr', 30)
+            duration = (lottie_data.get('op', 60) - lottie_data.get('ip', 0)) / frame_rate
+            layers_count = len(lottie_data.get('layers', []))
+            
+            # Create thumbnail with animation dimensions
+            img = Image.new('RGB', (300, 200), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a gradient background
+            for y in range(200):
+                color_value = int(240 - (y * 0.1))
+                draw.line([(0, y), (300, y)], fill=(color_value, color_value, color_value))
+            
+            # Draw a frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Try to extract colors from the animation
+            colors = []
+            layers = lottie_data.get('layers', [])
+            for layer in layers[:3]:  # Check first 3 layers
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'fl':  # Fill
+                        color_data = shape.get('c', {}).get('k', [0, 0, 0, 1])
+                        if isinstance(color_data, list) and len(color_data) >= 3:
+                            r = int(color_data[0] * 255)
+                            g = int(color_data[1] * 255)
+                            b = int(color_data[2] * 255)
+                            colors.append((r, g, b))
+                            if len(colors) >= 3:
+                                break
+                if len(colors) >= 3:
+                    break
+            
+            # Draw color swatches
+            if colors:
+                for i, color in enumerate(colors[:3]):
+                    x = 50 + (i * 60)
+                    y = 60
+                    draw.rectangle([x, y, x + 40, y + 40], fill=color, outline=(100, 100, 100))
+            
+            # Add text info
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    f"{anim_width}x{anim_height}",
+                    f"{duration:.1f}s @ {frame_rate}fps",
+                    f"{layers_count} layers"
+                ]
+                
+                y_offset = 120
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(80, 80, 80), font=font)
+                    y_offset += 15
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            
+        except Exception as e:
+            print(f"Error creating Lottie thumbnail: {e}")
+            # Create a minimal fallback
+            img = Image.new('RGB', (300, 200), (200, 200, 200))
+            img.save(thumbnail_path, 'PNG')
 
     async def _create_lottie_placeholder(self, thumbnail_path: Path):
         """Create a simple placeholder thumbnail for Lottie files"""
