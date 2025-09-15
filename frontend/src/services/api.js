@@ -140,11 +140,30 @@ export const apiService = {
     return response.data;
   },
 
+  // Bulk Import
+  async bulkImportUpload(formData) {
+    const response = await api.post('/bulk-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  async bulkImportCreateTemplates(importData) {
+    const response = await api.post('/bulk-import/create-templates', importData);
+    return response.data;
+  },
+
   async importFromUrl(url) {
     const formData = new FormData();
     formData.append('url', url);
     
     const response = await api.post('/templates/import-url', formData);
+    return response.data;
+  },
+
+  async resolveLottieUrl(url) {
+    const params = new URLSearchParams({ url });
+    const response = await api.get(`/lottie/resolve?${params.toString()}`);
     return response.data;
   },
 

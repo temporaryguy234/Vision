@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Filter, Play, Edit, Download } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -7,6 +7,7 @@ const LibraryPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [hoveredId, setHoveredId] = useState(null);
 
   const categories = [
     { value: '', label: 'All Categories' },
@@ -46,6 +47,61 @@ const LibraryPage = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     loadTemplates();
+  };
+
+  // Lightweight hover animation renderer using lottie-web
+  const HoverAnimation = ({ fileUrl, show }) => {
+    const containerRef = useRef(null);
+    const animRef = useRef(null);
+    useEffect(() => {
+      const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+      async function load() {
+        if (!show || !containerRef.current) return;
+        try {
+          let data;
+          if (fileUrl?.startsWith('/uploads/')) {
+            const filePath = fileUrl.replace('/uploads/', '');
+            const resp = await fetch(`${backendBase}/api/lottie/${filePath}`);
+            if (!resp.ok) throw new Error('Failed to load lottie');
+            data = await resp.json();
+          } else if (fileUrl) {
+            const resp = await fetch(`${backendBase}/api/lottie/resolve?url=${encodeURIComponent(fileUrl)}`);
+            if (!resp.ok) throw new Error('Failed to resolve lottie');
+            data = await resp.json();
+          } else {
+            return;
+          }
+          const lottieWeb = await import('lottie-web');
+          if (animRef.current) {
+            animRef.current.destroy();
+            animRef.current = null;
+          }
+          animRef.current = lottieWeb.loadAnimation({
+            container: containerRef.current,
+            renderer: 'canvas',
+            loop: true,
+            autoplay: true,
+            animationData: data
+          });
+        } catch (e) {
+          // swallow hover preview errors
+        }
+      }
+      load();
+      return () => {
+        if (animRef.current) {
+          animRef.current.destroy();
+          animRef.current = null;
+        }
+      };
+    }, [fileUrl, show]);
+    return (
+      <div
+        ref={containerRef}
+        className="absolute inset-0 hidden group-hover:block"
+        aria-hidden
+      />
+    );
   };
 
   return (
@@ -131,11 +187,13 @@ const LibraryPage = () => {
               <div key={template.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                 
                 {/* Preview */}
-                <div className="aspect-video bg-gradient-to-br from-orange-100 to-red-100 relative group">
+                <div className="aspect-video bg-gradient-to-br from-orange-100 to-red-100 relative group"
+                     onMouseEnter={() => setHoveredId(template.id)}
+                     onMouseLeave={() => setHoveredId(null)}>
                   {template.preview_url ? (
                     <img
                       src={template.preview_url}
-                      alt={template.name}
+                      alt={template.title || template.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -143,6 +201,9 @@ const LibraryPage = () => {
                       <Play className="w-12 h-12 text-orange-500" />
                     </div>
                   )}
+
+                  {/* Hover playback overlay */}
+                  <HoverAnimation fileUrl={template.file_url} show={hoveredId === template.id} />
                   
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
@@ -161,7 +222,7 @@ const LibraryPage = () => {
                 {/* Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-1 truncate">
-                    {template.name}
+                    {template.title || template.name}
                   </h3>
                   
                   {template.description && (
