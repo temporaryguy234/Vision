@@ -474,8 +474,9 @@ async def import_from_url(
         async with aiofiles.open(file_path, 'w') as f:
             await f.write(content)
         
-        # Generate preview
-        preview_url = f"/uploads/previews/{unique_filename}.png"
+        # Generate previews (thumbnail + optional short video)
+        preview_url = await file_storage_manager.generate_thumbnail(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON) or ""
         
         # Generate proper slug
         base_name = filename_lower.replace('.json', '').replace('.lottie', '')
@@ -498,6 +499,7 @@ async def import_from_url(
             # Add required fields for Template model compatibility
             "slug": safe_slug,
             "preview_image_url": preview_url,
+            "preview_video_url": preview_video_url,
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []
