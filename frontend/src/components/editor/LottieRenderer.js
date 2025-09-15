@@ -70,30 +70,26 @@ const LottieRenderer = ({
         } else {
           let resolvedUrl = sourceUrl;
           if (resolvedUrl.startsWith('/uploads/')) {
-            resolvedUrl = `${backendBase}${resolvedUrl}`;
-          }
-
-          const tryProxy = async () => {
-            const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
-            const proxyResp = await fetch(proxyUrl);
-            if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
-            return proxyResp.json();
-          };
-
-          try {
-            let response = await fetch(resolvedUrl);
-            if (!response.ok) {
-              data = await tryProxy();
-            } else {
-              try {
-                data = await response.json();
-              } catch (_) {
-                data = await tryProxy();
-              }
+            // Use the new direct Lottie endpoint for uploads
+            const filePath = resolvedUrl.replace('/uploads/', '');
+            const lottieUrl = `${backendBase}/api/lottie/${filePath}`;
+            const response = await fetch(lottieUrl);
+            if (!response.ok) throw new Error(`Failed to load Lottie file: ${response.status}`);
+            data = await response.json();
+          } else {
+            // For external URLs, try direct fetch first, then proxy
+            try {
+              const response = await fetch(resolvedUrl);
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              data = await response.json();
+            } catch (error) {
+              console.warn('Direct fetch failed, trying proxy:', error.message);
+              // Fallback to proxy for external URLs
+              const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
+              const proxyResp = await fetch(proxyUrl);
+              if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
+              data = await proxyResp.json();
             }
-          } catch (_) {
-            // Network/CORS error -> fall back to proxy
-            data = await tryProxy();
           }
         }
 
