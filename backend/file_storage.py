@@ -400,15 +400,209 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
-            # For Lottie JSON, return a neutral placeholder to avoid broken UI
+            # For Lottie JSON, generate a real thumbnail
             if asset_type == AssetType.LOTTIE_JSON:
-                return "/uploads/thumbnails/lottie_placeholder.svg"
+                return await self._generate_lottie_thumbnail(file_path, thumbnail_path)
             # For other types, we might return a default thumbnail or None
             return None
             
         except Exception as e:
             print(f"Error generating thumbnail: {e}")
             return None
+
+    async def _generate_lottie_thumbnail(self, file_path: Path, thumbnail_path: Path) -> Optional[str]:
+        """Generate a thumbnail for Lottie animation using lottie-web"""
+        try:
+            # Read the Lottie JSON file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                animation_data = json.load(f)
+            
+            # Create a simple HTML file to render the Lottie animation
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+            </head>
+            <body>
+                <div id="lottie-container" style="width: 300px; height: 200px;"></div>
+                <script>
+                    const animation = lottie.loadAnimation({{
+                        container: document.getElementById('lottie-container'),
+                        renderer: 'canvas',
+                        loop: false,
+                        autoplay: false,
+                        animationData: {json.dumps(animation_data)}
+                    }});
+                    
+                    animation.addEventListener('DOMLoaded', () => {{
+                        // Wait a bit for the animation to render
+                        setTimeout(() => {{
+                            const canvas = document.querySelector('canvas');
+                            if (canvas) {{
+                                // Convert canvas to image and send to parent
+                                const dataURL = canvas.toDataURL('image/png');
+                                window.parent.postMessage({{type: 'thumbnail', data: dataURL}}, '*');
+                            }}
+                        }}, 100);
+                    }});
+                </script>
+            </body>
+            </html>
+            """
+            
+            # For now, create a simple colored thumbnail based on animation properties
+            # This is a fallback until we implement proper Lottie rendering
+            width = animation_data.get('w', 1920)
+            height = animation_data.get('h', 1080)
+            
+            # Create a simple thumbnail with animation info
+            img = Image.new('RGB', (300, 200), color='#f0f0f0')
+            
+            # Try to get a color from the animation
+            bg_color = self._extract_background_color(animation_data)
+            if bg_color:
+                img = Image.new('RGB', (300, 200), color=bg_color)
+            
+            # Add some text overlay
+            from PIL import ImageDraw, ImageFont
+            draw = ImageDraw.Draw(img)
+            
+            try:
+                # Try to use a default font
+                font = ImageFont.load_default()
+            except:
+                font = None
+            
+            # Draw animation info
+            text_lines = [
+                f"Lottie Animation",
+                f"{width}x{height}",
+                f"{len(animation_data.get('layers', []))} layers"
+            ]
+            
+            y_offset = 50
+            for line in text_lines:
+                draw.text((10, y_offset), line, fill='#333333', font=font)
+                y_offset += 25
+            
+            # Save thumbnail
+            img.save(thumbnail_path, "PNG")
+            return f"/uploads/thumbnails/{thumbnail_path.name}"
+            
+        except Exception as e:
+            print(f"Error generating Lottie thumbnail: {e}")
+            # Return placeholder as fallback
+            return "/uploads/thumbnails/lottie_placeholder.svg"
+    
+    def _extract_background_color(self, animation_data: Dict) -> Optional[str]:
+        """Extract background color from Lottie animation data"""
+        try:
+            # Look for background color in layers
+            layers = animation_data.get('layers', [])
+            for layer in layers:
+                if layer.get('ty') == 1:  # Solid layer
+                    sc = layer.get('sc', '')
+                    if sc:
+                        # Convert color to hex
+                        if isinstance(sc, str) and sc.startswith('#'):
+                            return sc
+                        elif isinstance(sc, list) and len(sc) >= 3:
+                            r, g, b = int(sc[0] * 255), int(sc[1] * 255), int(sc[2] * 255)
+                            return f"#{r:02x}{g:02x}{b:02x}"
+            
+            # Look for background in composition
+            bg_color = animation_data.get('bg')
+            if bg_color:
+                if isinstance(bg_color, str) and bg_color.startswith('#'):
+                    return bg_color
+                elif isinstance(bg_color, list) and len(bg_color) >= 3:
+                    r, g, b = int(bg_color[0] * 255), int(bg_color[1] * 255), int(bg_color[2] * 255)
+                    return f"#{r:02x}{g:02x}{b:02x}"
+            
+            return None
+        except:
+            return None
+
+    async def generate_preview_video(self, file_url: str, asset_type: AssetType) -> Optional[str]:
+        """Generate a preview video for the asset"""
+        file_path = self.get_file_path(file_url)
+        if not file_path:
+            return None
+        
+        preview_dir = self.base_upload_dir / "previews"
+        preview_dir.mkdir(exist_ok=True)
+        
+        # Generate preview video filename
+        preview_filename = f"{file_path.stem}_preview.webm"
+        preview_path = preview_dir / preview_filename
+        
+        try:
+            if asset_type == AssetType.LOTTIE_JSON:
+                return await self._generate_lottie_preview_video(file_path, preview_path)
+            elif asset_type in [AssetType.MP4, AssetType.WEBM_ALPHA]:
+                # For video files, create a shorter preview
+                cmd = [
+                    'ffmpeg', '-i', str(file_path), '-t', '3', '-c:v', 'libvpx-vp9',
+                    '-crf', '30', '-b:v', '0', '-y', str(preview_path)
+                ]
+                result = subprocess.run(cmd, capture_output=True)
+                
+                if result.returncode == 0 and preview_path.exists():
+                    return f"/uploads/previews/{preview_filename}"
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error generating preview video: {e}")
+            return None
+
+    async def _generate_lottie_preview_video(self, file_path: Path, preview_path: Path) -> Optional[str]:
+        """Generate a preview video for Lottie animation"""
+        try:
+            # Read the Lottie JSON file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                animation_data = json.load(f)
+            
+            # Get animation duration
+            duration = animation_data.get('op', 0) / animation_data.get('fr', 30)  # frames / fps
+            duration = min(duration, 5)  # Max 5 seconds for preview
+            
+            # Create a simple HTML file to render the Lottie animation
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+            </head>
+            <body>
+                <div id="lottie-container" style="width: 640px; height: 360px;"></div>
+                <script>
+                    const animation = lottie.loadAnimation({{
+                        container: document.getElementById('lottie-container'),
+                        renderer: 'canvas',
+                        loop: false,
+                        autoplay: true,
+                        animationData: {json.dumps(animation_data)}
+                    }});
+                    
+                    animation.addEventListener('DOMLoaded', () => {{
+                        // Animation is ready
+                        console.log('Animation loaded');
+                    }});
+                </script>
+            </body>
+            </html>
+            """
+            
+            # For now, return empty string as we need a proper headless browser solution
+            # This would require puppeteer or similar to render the HTML and record it
+            print(f"Preview video generation for Lottie not fully implemented yet: {file_path}")
+            return ""
+            
+        except Exception as e:
+            print(f"Error generating Lottie preview video: {e}")
+            return ""
 
 # Global instance
 file_storage = FileStorageManager()

@@ -400,9 +400,9 @@ async def upload_template(
         # Process file
         animation_data, manifest = await lottie_processor.process_file(file_path)
         
-        # Generate preview (placeholder for now)
-        preview_url = f"/uploads/previews/{unique_filename}.png"
-        preview_video_url = ""
+        # Generate preview thumbnail and video
+        preview_url = await file_storage_manager.generate_thumbnail(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(f"/uploads/{unique_filename}", AssetType.LOTTIE_JSON)
         
         # Generate proper slug
         base_name = filename_lower.replace('.json', '').replace('.lottie', '')
