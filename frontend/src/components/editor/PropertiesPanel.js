@@ -548,7 +548,9 @@ const PropertiesPanel = ({
             {expandedSections.elements && (
               <div className="px-4 pb-4">
                 {selectedElements.map(elementId => {
-                  const element = template?.editable_parameters_schema.elements.find(e => e.id === elementId);
+                  // Look for element in both editable_parameters_schema and manifest
+                  const element = template?.editable_parameters_schema?.elements?.find(e => e.id === elementId) ||
+                                 template?.manifest?.elements?.find(e => e.id === elementId);
                   if (!element) return null;
                   
                   const Icon = getElementIcon(element.type);

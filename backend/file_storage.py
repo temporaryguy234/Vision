@@ -402,20 +402,22 @@ class FileStorageManager:
             
             # For Lottie JSON, generate actual thumbnail
             elif asset_type == AssetType.LOTTIE_JSON:
-                from lottie_thumbnail_generator import lottie_thumbnail_generator
+                from lottie_thumbnail_generator import LottieThumbnailGenerator
                 
                 # Extract Lottie data
                 lottie_data = await self._extract_lottie_data(file_path)
                 if lottie_data:
                     # Generate thumbnail
-                    success = await lottie_thumbnail_generator.generate_thumbnail(
+                    generator = LottieThumbnailGenerator()
+                    success = await generator.generate_thumbnail(
                         lottie_data, thumbnail_path, 300, 200
                     )
                     if success and thumbnail_path.exists():
                         return f"/uploads/thumbnails/{thumbnail_filename}"
                 
                 # Fallback to placeholder if generation fails
-                return "/uploads/thumbnails/lottie_placeholder.png"
+                await self._create_lottie_placeholder(thumbnail_path)
+                return f"/uploads/thumbnails/{thumbnail_filename}"
             # For other types, we might return a default thumbnail or None
             return None
             
@@ -574,6 +576,47 @@ class FileStorageManager:
             return None
         except:
             return None
+
+    async def _create_lottie_placeholder(self, thumbnail_path: Path):
+        """Create a simple placeholder thumbnail for Lottie files"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Create a simple placeholder image
+            img = Image.new('RGB', (300, 200), (240, 240, 240))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a simple frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Add text
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    "Thumbnail Preview"
+                ]
+                
+                y_offset = 80
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(100, 100, 100), font=font)
+                    y_offset += 25
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            
+        except Exception as e:
+            print(f"Error creating Lottie placeholder: {e}")
+            # Create a minimal fallback
+            img = Image.new('RGB', (300, 200), (200, 200, 200))
+            img.save(thumbnail_path, 'PNG')
 
     async def generate_preview_video(self, file_url: str, asset_type: AssetType) -> Optional[str]:
         """Generate a preview video for the asset"""

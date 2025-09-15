@@ -1,12 +1,16 @@
 import os
-import openai
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import json
 import re
 
-# OpenAI Configuration
-openai.api_key = os.environ.get('OPENAI_API_KEY')
+# Try to import OpenAI, fallback if not available
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+    openai.api_key = os.environ.get('OPENAI_API_KEY')
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 class AIPromptRequest(BaseModel):
     prompt: str
@@ -49,7 +53,18 @@ class AIService:
         """
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            if not OPENAI_AVAILABLE or not openai.api_key:
+                # Use fallback processing if OpenAI is not available
+                patches = self._fallback_prompt_processing(prompt, manifest, current_state)
+                return AIPromptResponse(
+                    patches=patches,
+                    explanation=f"Rule-based interpretation: {prompt}",
+                    confidence=0.5
+                )
+            
+            # Use new OpenAI API format
+            client = openai.OpenAI(api_key=openai.api_key)
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

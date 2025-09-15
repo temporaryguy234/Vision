@@ -242,7 +242,7 @@ const Canvas = forwardRef(({
           }}
         >
           {/* Render Elements */}
-          {template.editable_parameters_schema.elements.map(element => (
+          {(template.editable_parameters_schema?.elements || template.manifest?.elements || []).map(element => (
             <ElementRenderer
               key={element.id}
               element={element}
@@ -256,7 +256,8 @@ const Canvas = forwardRef(({
           
           {/* Selection Boxes */}
           {selectedElements.map(elementId => {
-            const element = template.editable_parameters_schema.elements.find(e => e.id === elementId);
+            const element = template.editable_parameters_schema?.elements?.find(e => e.id === elementId) ||
+                           template.manifest?.elements?.find(e => e.id === elementId);
             const elementState = editorState.elements[elementId] || {};
             
             if (!element) return null;
