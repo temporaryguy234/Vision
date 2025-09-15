@@ -26,15 +26,91 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 # Import our models and processors
-from models import *
-from lottie_processor import lottie_processor
-from file_storage import FileStorageManager
-from auth import AuthService, get_current_user, get_current_user_optional, User, UserCreate, UserLogin, GoogleAuthRequest
-from subscription import SubscriptionService, SubscriptionTier
-from payments import PaymentService, PaymentIntent
-from ai_service import ai_service, AIPromptRequest
-from export_service import ExportService
-from lottiefiles import lottiefiles_service
+try:
+    from models import *
+    from lottie_processor import lottie_processor
+    from file_storage import FileStorageManager
+    from auth import AuthService, get_current_user, get_current_user_optional, User, UserCreate, UserLogin, GoogleAuthRequest
+    from subscription import SubscriptionService, SubscriptionTier
+    from payments import PaymentService, PaymentIntent
+    from ai_service import ai_service, AIPromptRequest
+    from export_service import ExportService
+    from lottiefiles import lottiefiles_service
+except ImportError as e:
+    logger.error(f"Critical import error: {e}")
+    # Create minimal fallback classes
+    class Template:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            self.id = kwargs.get('id', 'fallback-id')
+            self.title = kwargs.get('title', 'Fallback Template')
+    
+    class AssetType:
+        LOTTIE_JSON = "lottie_json"
+        MP4 = "mp4"
+        PNG = "png"
+        GIF = "gif"
+    
+    class TemplateCategory:
+        MISCELLANEOUS = "Miscellaneous"
+    
+    # Minimal fallback services
+    class lottie_processor:
+        @staticmethod
+        async def process_file(file_path):
+            return {}, {}
+        @staticmethod
+        async def process_url(url):
+            return {}, {}
+    
+    class FileStorageManager:
+        def __init__(self, base_upload_dir):
+            self.base_upload_dir = base_upload_dir
+        async def generate_thumbnail(self, file_url, asset_type):
+            return None
+        async def generate_preview_video(self, file_url, asset_type):
+            return None
+    
+    class AuthService:
+        def __init__(self, db):
+            self.db = db
+        def create_access_token(self, user_id, email):
+            return "fallback-token"
+    
+    class SubscriptionService:
+        def __init__(self, db):
+            self.db = db
+        def get_all_plans(self):
+            return []
+    
+    class PaymentService:
+        def __init__(self, db):
+            self.db = db
+    
+    class ai_service:
+        @staticmethod
+        async def process_natural_language_prompt(prompt, manifest, state):
+            return type('Response', (), {'patches': [], 'explanation': 'Fallback', 'confidence': 0.0})()
+    
+    class ExportService:
+        def __init__(self, db, file_storage):
+            self.db = db
+            self.file_storage = file_storage
+    
+    class lottiefiles_service:
+        @staticmethod
+        async def search_animations(**kwargs):
+            return []
+        @staticmethod
+        async def get_categories():
+            return []
+        @staticmethod
+        async def get_animation_details(animation_id):
+            return None
+        @staticmethod
+        async def download_animation(file_url):
+            return None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

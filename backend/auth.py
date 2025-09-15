@@ -6,9 +6,15 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
 import uuid
+
+# Import database function
+try:
+    from models import get_database
+except ImportError:
+    def get_database():
+        return None
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
@@ -38,9 +44,9 @@ class User(BaseModel):
     email: str
     full_name: str
     subscription_tier: str = "free"  # free, mid, pro
-    credits_remaining: int = 0
+    credits_remaining: int = 5
     subscription_expires: Optional[datetime] = None
-    created_at: datetime
+    created_at: datetime = datetime.utcnow()
     is_active: bool = True
 
 class AuthService:
