@@ -177,91 +177,160 @@ const EditorPage = () => {
   };
 
   const handlePrompt = async () => {
-    if (!promptText.trim()) return;
+    if (!promptText.trim() || !template?.id) return;
 
     try {
       setPromptLoading(true);
       
-      // Simple prompt processing for common commands
-      const prompt = promptText.toLowerCase().trim();
-      let changesApplied = 0;
+      // Use the full AI service for natural language processing
+      const response = await fetch(`/api/templates/${template.id}/prompt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          prompt: promptText.trim(),
+          state: currentState
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       
-      // Handle common prompt commands
-      if (prompt.includes('faster') || prompt.includes('speed')) {
-        const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
-        if (speedMatch) {
-          const newSpeed = parseFloat(speedMatch[1]);
-          if (newSpeed > 0 && newSpeed <= 5) {
-            setSpeed(newSpeed);
-            setCurrentState(prev => ({ ...prev, speed: newSpeed }));
-            setEditorState(prev => ({
-              ...prev,
-              canvas: {
-                ...prev.canvas,
-                global_playback_speed: newSpeed
-              }
-            }));
+      if (result.patches && result.patches.length > 0) {
+        // Apply AI-generated patches
+        let changesApplied = 0;
+        
+        for (const patch of result.patches) {
+          try {
+            await applyPatch(patch);
             changesApplied++;
+          } catch (patchError) {
+            console.error('Failed to apply patch:', patch, patchError);
           }
         }
-      }
-      
-      if (prompt.includes('slower')) {
-        const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
-        if (speedMatch) {
-          const newSpeed = parseFloat(speedMatch[1]);
-          if (newSpeed > 0 && newSpeed <= 5) {
-            setSpeed(newSpeed);
-            setCurrentState(prev => ({ ...prev, speed: newSpeed }));
-            setEditorState(prev => ({
-              ...prev,
-              canvas: {
-                ...prev.canvas,
-                global_playback_speed: newSpeed
-              }
-            }));
-            changesApplied++;
-          }
-        }
-      }
-      
-      if (prompt.includes('color') || prompt.includes('colour')) {
-        const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
-        if (colorMatch) {
-          const color = '#' + colorMatch[1];
-          // Apply color to first available element
-          const elements = template?.editable_parameters_schema?.elements || template?.manifest?.elements || [];
-          if (elements.length > 0) {
-            const firstElement = elements[0];
-            handlePropertyChange(firstElement.id, 'color', color);
-            changesApplied++;
-          }
-        }
-      }
-      
-      if (prompt.includes('background')) {
-        const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
-        if (colorMatch) {
-          const color = '#' + colorMatch[1];
-          handleCanvasChange('background_color', color);
-          changesApplied++;
-        }
-      }
-      
-      // Clear prompt
-      setPromptText('');
-      
-      if (changesApplied > 0) {
-        alert(`Applied ${changesApplied} changes from prompt`);
+        
+        // Clear prompt
+        setPromptText('');
+        
+        // Show success message with AI explanation
+        alert(`✅ Applied ${changesApplied} changes: ${result.explanation}`);
       } else {
-        alert('Prompt processed but no changes were made. Try: "make it faster", "change color to #FF0000", "set background to #000000"');
+        alert('❌ No changes could be made from your prompt. Try being more specific.');
       }
 
     } catch (err) {
-      console.error('Prompt processing failed:', err);
-      alert('Failed to process prompt. Please try again.');
+      console.error('AI prompt processing failed:', err);
+      
+      // Fallback to simple rule-based processing
+      try {
+        const prompt = promptText.toLowerCase().trim();
+        let changesApplied = 0;
+        
+        // Handle common prompt commands as fallback
+        if (prompt.includes('faster') || prompt.includes('speed')) {
+          const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
+          if (speedMatch) {
+            const newSpeed = parseFloat(speedMatch[1]);
+            if (newSpeed > 0 && newSpeed <= 5) {
+              setSpeed(newSpeed);
+              setCurrentState(prev => ({ ...prev, speed: newSpeed }));
+              setEditorState(prev => ({
+                ...prev,
+                canvas: {
+                  ...prev.canvas,
+                  global_playback_speed: newSpeed
+                }
+              }));
+              changesApplied++;
+            }
+          }
+        }
+        
+        if (prompt.includes('slower')) {
+          const speedMatch = prompt.match(/(\d+(?:\.\d+)?)/);
+          if (speedMatch) {
+            const newSpeed = parseFloat(speedMatch[1]);
+            if (newSpeed > 0 && newSpeed <= 5) {
+              setSpeed(newSpeed);
+              setCurrentState(prev => ({ ...prev, speed: newSpeed }));
+              setEditorState(prev => ({
+                ...prev,
+                canvas: {
+                  ...prev.canvas,
+                  global_playback_speed: newSpeed
+                }
+              }));
+              changesApplied++;
+            }
+          }
+        }
+        
+        if (prompt.includes('color') || prompt.includes('colour')) {
+          const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
+          if (colorMatch) {
+            const color = '#' + colorMatch[1];
+            // Apply color to first available element
+            const elements = template?.editable_parameters_schema?.elements || template?.manifest?.elements || [];
+            if (elements.length > 0) {
+              const firstElement = elements[0];
+              handlePropertyChange(firstElement.id, 'color', color);
+              changesApplied++;
+            }
+          }
+        }
+        
+        if (prompt.includes('background')) {
+          const colorMatch = prompt.match(/#([0-9a-fA-F]{6})/);
+          if (colorMatch) {
+            const color = '#' + colorMatch[1];
+            handleCanvasChange('background_color', color);
+            changesApplied++;
+          }
+        }
+        
+        // Clear prompt
+        setPromptText('');
+        
+        if (changesApplied > 0) {
+          alert(`Applied ${changesApplied} changes from prompt (fallback mode)`);
+        } else {
+          alert('❌ Failed to process prompt. Try: "make it faster", "change color to #FF0000", "set background to #000000"');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback prompt processing failed:', fallbackError);
+        alert('❌ Failed to process prompt. Please try again.');
+      }
     } finally {
       setPromptLoading(false);
+    }
+  };
+
+  // Apply AI-generated patches to the animation
+  const applyPatch = async (patch) => {
+    const { op, path, value } = patch;
+    
+    if (op === 'replace') {
+      // Parse the path to determine what to update
+      const pathParts = path.split('/').filter(p => p);
+      
+      if (pathParts[0] === 'elements' && pathParts.length >= 3) {
+        const elementId = pathParts[1];
+        const property = pathParts[2];
+        
+        // Update element property
+        handlePropertyChange(elementId, property, value);
+        
+      } else if (pathParts[0] === 'canvas' && pathParts.length >= 2) {
+        const property = pathParts[1];
+        
+        // Update canvas property
+        handleCanvasChange(property, value);
+      }
     }
   };
 
@@ -319,32 +388,98 @@ const EditorPage = () => {
       [`elements.${elementId}.${property}`]: value
     }));
     
-    // Apply changes to animation data if it's a color change
-    if (property.includes('color') && animationData) {
+    // Apply changes to animation data based on property type
+    if (animationData) {
       const updatedAnim = JSON.parse(JSON.stringify(animationData));
       
-      // Find and update the color in the animation data
-      // This is a simplified approach - in a real implementation, you'd need to traverse the Lottie structure
-      const layers = updatedAnim.layers || [];
-      for (const layer of layers) {
-        const shapes = layer.shapes || [];
-        for (const shape of shapes) {
-          if (shape.ty === 'fl' && shape.c && shape.c.k) { // Fill color
-            // Convert hex color to RGB values (0-1 range)
-            if (value.startsWith('#')) {
-              const hex = value.slice(1);
-              const r = parseInt(hex.substr(0, 2), 16) / 255;
-              const g = parseInt(hex.substr(2, 2), 16) / 255;
-              const b = parseInt(hex.substr(4, 2), 16) / 255;
-              shape.c.k = [r, g, b, 1];
+      // Handle different types of property changes
+      if (property.includes('color')) {
+        // Color changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          const shapes = layer.shapes || [];
+          for (const shape of shapes) {
+            if (shape.ty === 'fl' && shape.c && shape.c.k) { // Fill color
+              if (value.startsWith('#')) {
+                const hex = value.slice(1);
+                const r = parseInt(hex.substr(0, 2), 16) / 255;
+                const g = parseInt(hex.substr(2, 2), 16) / 255;
+                const b = parseInt(hex.substr(4, 2), 16) / 255;
+                shape.c.k = [r, g, b, 1];
+              }
+            } else if (shape.ty === 'st' && shape.c && shape.c.k) { // Stroke color
+              if (value.startsWith('#')) {
+                const hex = value.slice(1);
+                const r = parseInt(hex.substr(0, 2), 16) / 255;
+                const g = parseInt(hex.substr(2, 2), 16) / 255;
+                const b = parseInt(hex.substr(4, 2), 16) / 255;
+                shape.c.k = [r, g, b, 1];
+              }
             }
-          } else if (shape.ty === 'st' && shape.c && shape.c.k) { // Stroke color
-            if (value.startsWith('#')) {
-              const hex = value.slice(1);
-              const r = parseInt(hex.substr(0, 2), 16) / 255;
-              const g = parseInt(hex.substr(2, 2), 16) / 255;
-              const b = parseInt(hex.substr(4, 2), 16) / 255;
-              shape.c.k = [r, g, b, 1];
+          }
+        }
+      } else if (property === 'scale') {
+        // Scale changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ks && layer.ks.s && layer.ks.s.k) {
+            // Scale property
+            if (Array.isArray(layer.ks.s.k)) {
+              layer.ks.s.k = [value * 100, value * 100, 100]; // Convert to percentage
+            } else if (typeof layer.ks.s.k === 'number') {
+              layer.ks.s.k = value * 100;
+            }
+          }
+        }
+      } else if (property === 'rotation') {
+        // Rotation changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ks && layer.ks.r && layer.ks.r.k) {
+            layer.ks.r.k = value;
+          }
+        }
+      } else if (property === 'opacity') {
+        // Opacity changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ks && layer.ks.o && layer.ks.o.k) {
+            layer.ks.o.k = value * 100; // Convert to percentage
+          }
+        }
+      } else if (property === 'x' || property === 'y') {
+        // Position changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ks && layer.ks.p && layer.ks.p.k) {
+            if (Array.isArray(layer.ks.p.k)) {
+              if (property === 'x') {
+                layer.ks.p.k[0] = value;
+              } else if (property === 'y') {
+                layer.ks.p.k[1] = value;
+              }
+            }
+          }
+        }
+      } else if (property === 'content') {
+        // Text content changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ty === 5) { // Text layer
+            const textData = layer.t?.d?.k?.[0]?.s;
+            if (textData) {
+              textData.t = value;
+            }
+          }
+        }
+      } else if (property === 'font_size') {
+        // Font size changes
+        const layers = updatedAnim.layers || [];
+        for (const layer of layers) {
+          if (layer.ty === 5) { // Text layer
+            const textData = layer.t?.d?.k?.[0]?.s;
+            if (textData && textData.s) {
+              textData.s.s = value;
             }
           }
         }
@@ -504,25 +639,74 @@ const EditorPage = () => {
           />
         </div>
         
-        {/* Prompt Box */}
-        <div className="border-t border-gray-200 p-4 bg-white">
-          <div className="flex items-center space-x-3">
-            <Zap className="w-5 h-5 text-orange-500" />
+        {/* AI Natural Language Editor */}
+        <div className="border-t border-gray-200 p-6 bg-gradient-to-r from-orange-50 to-red-50">
+          <div className="flex items-center space-x-3 mb-3">
+            <div className="flex items-center space-x-2">
+              <Zap className="w-6 h-6 text-orange-500" />
+              <h3 className="text-lg font-bold text-orange-800">🤖 AI Natural Language Editor</h3>
+            </div>
+          </div>
+          
+          <p className="text-sm text-orange-700 mb-4">
+            Describe any change you want to make in natural language. The AI will understand and apply it!
+          </p>
+          
+          <div className="flex items-center space-x-3 mb-3">
             <input
               type="text"
-              placeholder="Try: 'make it 30% faster', 'change title to Hello World', 'set primary color to #FF6A00'"
+              placeholder="Try: 'Move the text to center', 'Make it bigger', 'Change color to blue', 'Rotate 45 degrees', 'Make it transparent'..."
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handlePrompt()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+              className="flex-1 px-4 py-3 border-2 border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg"
             />
             <button
               onClick={handlePrompt}
               disabled={!promptText.trim() || promptLoading}
-              className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 disabled:opacity-50 font-semibold text-lg shadow-lg"
             >
-              {promptLoading ? 'Processing...' : 'Apply'}
+              {promptLoading ? '🔄 Processing...' : '✨ Apply'}
             </button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-xs text-orange-600">
+            <div>
+              <strong>Position & Size:</strong>
+              <ul className="list-disc list-inside space-y-1 mt-1">
+                <li>"Move to center"</li>
+                <li>"Make it bigger"</li>
+                <li>"Position at top left"</li>
+                <li>"Scale to 150%"</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Colors & Effects:</strong>
+              <ul className="list-disc list-inside space-y-1 mt-1">
+                <li>"Change to blue"</li>
+                <li>"Make it transparent"</li>
+                <li>"Set background to white"</li>
+                <li>"Add red border"</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Animation & Text:</strong>
+              <ul className="list-disc list-inside space-y-1 mt-1">
+                <li>"Make it faster"</li>
+                <li>"Change text to 'Hello'"</li>
+                <li>"Rotate 90 degrees"</li>
+                <li>"Increase font size"</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Shapes & Forms:</strong>
+              <ul className="list-disc list-inside space-y-1 mt-1">
+                <li>"Make it round"</li>
+                <li>"Change to square"</li>
+                <li>"Add rounded corners"</li>
+                <li>"Make it invisible"</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

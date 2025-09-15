@@ -106,33 +106,59 @@ class AIService:
         
         Available editable elements in this animation:
         
-        TEXT ELEMENTS:
-        {json.dumps(manifest.get('text', []), indent=2)}
+        ELEMENTS:
+        {json.dumps(manifest.get('elements', []), indent=2)}
         
-        COLOR ELEMENTS:
-        {json.dumps(manifest.get('colors', []), indent=2)}
-        
-        IMAGE ELEMENTS:
-        {json.dumps(manifest.get('images', []), indent=2)}
-        
-        CHART ELEMENTS:
-        {json.dumps(manifest.get('chart', []), indent=2)}
-        
-        SPEED CONTROL:
-        {json.dumps(manifest.get('speed', {}), indent=2)}
+        CANVAS PROPERTIES:
+        {json.dumps(manifest.get('canvas', {}), indent=2)}
         
         Current state:
         {json.dumps(current_state, indent=2)}
         
-        You can create JSON patch operations with these formats:
+        You can create JSON patch operations to modify ANY aspect of the animation:
         
-        1. Text changes: {{"op": "replace", "path": "/text/{{element_id}}", "value": "new text"}}
-        2. Color changes: {{"op": "replace", "path": "/colors/{{element_id}}", "value": "#FF6A00"}}
-        3. Image changes: {{"op": "replace", "path": "/images/{{element_id}}", "value": "https://example.com/image.jpg"}}
-        4. Speed changes: {{"op": "replace", "path": "/speed", "value": 1.5}}
-        5. Chart data: {{"op": "replace", "path": "/chart/data", "value": [10, 20, 30, 40]}}
+        POSITION/LOCATION:
+        - Move elements: {{"op": "replace", "path": "/elements/{{element_id}}/x", "value": 50}}
+        - Move elements: {{"op": "replace", "path": "/elements/{{element_id}}/y", "value": 30}}
+        - Position relative: {{"op": "replace", "path": "/elements/{{element_id}}/position", "value": "center"}}
+        
+        SIZE/SCALE:
+        - Scale elements: {{"op": "replace", "path": "/elements/{{element_id}}/scale", "value": 1.5}}
+        - Resize: {{"op": "replace", "path": "/elements/{{element_id}}/width", "value": 200}}
+        - Resize: {{"op": "replace", "path": "/elements/{{element_id}}/height", "value": 150}}
+        
+        FORM/SHAPE:
+        - Change shape: {{"op": "replace", "path": "/elements/{{element_id}}/shape", "value": "circle"}}
+        - Border radius: {{"op": "replace", "path": "/elements/{{element_id}}/corner_radius", "value": 20}}
+        - Stroke width: {{"op": "replace", "path": "/elements/{{element_id}}/stroke_width", "value": 3}}
+        
+        COLORS:
+        - Fill color: {{"op": "replace", "path": "/elements/{{element_id}}/fill_color", "value": "#FF6A00"}}
+        - Stroke color: {{"op": "replace", "path": "/elements/{{element_id}}/stroke_color", "value": "#000000"}}
+        - Text color: {{"op": "replace", "path": "/elements/{{element_id}}/color", "value": "#FFFFFF"}}
+        - Background: {{"op": "replace", "path": "/canvas/background_color", "value": "#F0F0F0"}}
+        
+        TEXT:
+        - Change text: {{"op": "replace", "path": "/elements/{{element_id}}/content", "value": "New Text"}}
+        - Font size: {{"op": "replace", "path": "/elements/{{element_id}}/font_size", "value": 24}}
+        - Font family: {{"op": "replace", "path": "/elements/{{element_id}}/font_family", "value": "Arial"}}
+        - Alignment: {{"op": "replace", "path": "/elements/{{element_id}}/alignment", "value": "center"}}
+        
+        ANIMATION:
+        - Speed: {{"op": "replace", "path": "/canvas/global_playback_speed", "value": 1.5}}
+        - Rotation: {{"op": "replace", "path": "/elements/{{element_id}}/rotation", "value": 45}}
+        - Opacity: {{"op": "replace", "path": "/elements/{{element_id}}/opacity", "value": 0.8}}
+        
+        IMAGES:
+        - Change image: {{"op": "replace", "path": "/elements/{{element_id}}/source_url", "value": "https://example.com/image.jpg"}}
+        - Image fit: {{"op": "replace", "path": "/elements/{{element_id}}/fit", "value": "cover"}}
+        
+        CANVAS:
+        - Canvas size: {{"op": "replace", "path": "/canvas/width", "value": 800}}
+        - Canvas size: {{"op": "replace", "path": "/canvas/height", "value": 600}}
         
         Always return valid JSON with patches array, explanation, and confidence score.
+        Be creative and interpret user intent broadly - you can modify ANY property of the animation.
         """
     
     def _extract_patches_from_text(self, text: str, prompt: str, manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -163,28 +189,153 @@ class AIService:
         manifest: Dict[str, Any], 
         current_state: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Fallback rule-based prompt processing"""
+        """Enhanced fallback rule-based prompt processing for ALL types of changes"""
         patches = []
         prompt_lower = prompt.lower()
         
-        # Text changes
+        # Get available elements
+        elements = manifest.get('elements', [])
+        if not elements:
+            return patches
+        
+        # Use first element as default target
+        target_element = elements[0]
+        element_id = target_element.get('id', 'element_1')
+        
+        # POSITION/LOCATION changes
+        if any(word in prompt_lower for word in ['move', 'position', 'location', 'place', 'center', 'left', 'right', 'top', 'bottom']):
+            x_value = 50  # default center
+            y_value = 50  # default center
+            
+            if 'center' in prompt_lower:
+                x_value, y_value = 50, 50
+            elif 'left' in prompt_lower:
+                x_value = 20
+            elif 'right' in prompt_lower:
+                x_value = 80
+            elif 'top' in prompt_lower:
+                y_value = 20
+            elif 'bottom' in prompt_lower:
+                y_value = 80
+            
+            # Look for specific coordinates
+            coord_match = re.search(r'(\d+).*?(\d+)', prompt)
+            if coord_match:
+                x_value = min(100, max(0, int(coord_match.group(1))))
+                y_value = min(100, max(0, int(coord_match.group(2))))
+            
+            patches.extend([
+                {"op": "replace", "path": f"/elements/{element_id}/x", "value": x_value},
+                {"op": "replace", "path": f"/elements/{element_id}/y", "value": y_value}
+            ])
+        
+        # SIZE/SCALE changes
+        if any(word in prompt_lower for word in ['size', 'scale', 'bigger', 'smaller', 'larger', 'resize']):
+            scale_value = 1.0
+            
+            if 'bigger' in prompt_lower or 'larger' in prompt_lower:
+                scale_value = 1.5
+            elif 'smaller' in prompt_lower:
+                scale_value = 0.7
+            
+            # Look for specific scale values
+            scale_match = re.search(r'(\d+(?:\.\d+)?)', prompt)
+            if scale_match:
+                scale_value = float(scale_match.group(1))
+                if scale_value > 5:
+                    scale_value = scale_value / 100  # Convert percentage
+            
+            patches.append({
+                "op": "replace",
+                "path": f"/elements/{element_id}/scale",
+                "value": min(5.0, max(0.1, scale_value))
+            })
+        
+        # FORM/SHAPE changes
+        if any(word in prompt_lower for word in ['shape', 'form', 'circle', 'square', 'rectangle', 'round', 'corner']):
+            if 'circle' in prompt_lower or 'round' in prompt_lower:
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/shape",
+                    "value": "circle"
+                })
+            elif 'square' in prompt_lower or 'rectangle' in prompt_lower:
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/shape",
+                    "value": "rectangle"
+                })
+            
+            # Border radius
+            radius_match = re.search(r'(\d+)', prompt)
+            if radius_match:
+                radius_value = int(radius_match.group(1))
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/corner_radius",
+                    "value": min(100, max(0, radius_value))
+                })
+        
+        # ROTATION changes
+        if any(word in prompt_lower for word in ['rotate', 'turn', 'angle', 'degrees']):
+            rotation_value = 0
+            
+            if 'left' in prompt_lower:
+                rotation_value = -45
+            elif 'right' in prompt_lower:
+                rotation_value = 45
+            elif 'upside down' in prompt_lower:
+                rotation_value = 180
+            
+            # Look for specific degrees
+            degree_match = re.search(r'(\d+)', prompt)
+            if degree_match:
+                rotation_value = int(degree_match.group(1))
+            
+            patches.append({
+                "op": "replace",
+                "path": f"/elements/{element_id}/rotation",
+                "value": rotation_value % 360
+            })
+        
+        # OPACITY changes
+        if any(word in prompt_lower for word in ['opacity', 'transparent', 'fade', 'visible', 'invisible']):
+            opacity_value = 1.0
+            
+            if 'transparent' in prompt_lower or 'invisible' in prompt_lower:
+                opacity_value = 0.0
+            elif 'fade' in prompt_lower:
+                opacity_value = 0.5
+            
+            # Look for specific opacity values
+            opacity_match = re.search(r'(\d+(?:\.\d+)?)', prompt)
+            if opacity_match:
+                opacity_value = float(opacity_match.group(1))
+                if opacity_value > 1:
+                    opacity_value = opacity_value / 100  # Convert percentage
+            
+            patches.append({
+                "op": "replace",
+                "path": f"/elements/{element_id}/opacity",
+                "value": min(1.0, max(0.0, opacity_value))
+            })
+        
+        # TEXT changes
         text_match = re.search(r'(?:change|set|update).*?(?:text|title|heading).*?(?:to|=)\s*["\']([^"\']+)["\']', prompt, re.I)
         if not text_match:
             text_match = re.search(r'(?:text|title|heading).*?["\']([^"\']+)["\']', prompt, re.I)
         
-        if text_match and manifest.get('text'):
+        if text_match:
             new_text = text_match.group(1)
-            # Use first text element
-            first_text = manifest['text'][0]
             patches.append({
                 "op": "replace",
-                "path": f"/text/{first_text['id']}",
+                "path": f"/elements/{element_id}/content",
                 "value": new_text
             })
         
-        # Color changes
+        # COLOR changes
         color_match = re.search(r'(?:change|set|make).*?color.*?(?:to|=)\s*(#[0-9a-fA-F]{6}|red|blue|green|yellow|orange|purple|pink|black|white)', prompt, re.I)
-        if color_match and manifest.get('colors'):
+        if color_match:
             color_value = color_match.group(1)
             
             # Convert named colors to hex
@@ -197,15 +348,27 @@ class AIService:
             if color_value.lower() in color_map:
                 color_value = color_map[color_value.lower()]
             
-            # Use first color element
-            first_color = manifest['colors'][0]
-            patches.append({
-                "op": "replace",
-                "path": f"/colors/{first_color['id']}",
-                "value": color_value
-            })
+            # Determine color type
+            if 'background' in prompt_lower:
+                patches.append({
+                    "op": "replace",
+                    "path": "/canvas/background_color",
+                    "value": color_value
+                })
+            elif 'stroke' in prompt_lower or 'border' in prompt_lower:
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/stroke_color",
+                    "value": color_value
+                })
+            else:
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/fill_color",
+                    "value": color_value
+                })
         
-        # Speed changes
+        # SPEED changes
         speed_match = re.search(r'(?:speed|faster|slower).*?(\d+(?:\.\d+)?)', prompt, re.I)
         if speed_match:
             speed_value = float(speed_match.group(1))
@@ -217,32 +380,43 @@ class AIService:
             
             patches.append({
                 "op": "replace",
-                "path": "/speed",
+                "path": "/canvas/global_playback_speed",
                 "value": speed_value
             })
         elif 'faster' in prompt_lower:
             patches.append({
                 "op": "replace",
-                "path": "/speed",
+                "path": "/canvas/global_playback_speed",
                 "value": 1.5
             })
         elif 'slower' in prompt_lower:
             patches.append({
                 "op": "replace",
-                "path": "/speed",
+                "path": "/canvas/global_playback_speed",
                 "value": 0.7
             })
         
-        # Image changes
-        image_match = re.search(r'(?:change|replace|set).*?(?:image|logo|picture).*?(?:to|=)\s*(https?://\S+)', prompt, re.I)
-        if image_match and manifest.get('images'):
-            image_url = image_match.group(1)
-            first_image = manifest['images'][0]
-            patches.append({
-                "op": "replace",
-                "path": f"/images/{first_image['id']}",
-                "value": image_url
-            })
+        # FONT SIZE changes
+        if 'font size' in prompt_lower or 'text size' in prompt_lower:
+            size_match = re.search(r'(\d+)', prompt)
+            if size_match:
+                font_size = int(size_match.group(1))
+                patches.append({
+                    "op": "replace",
+                    "path": f"/elements/{element_id}/font_size",
+                    "value": min(180, max(12, font_size))
+                })
+        
+        # CANVAS SIZE changes
+        if any(word in prompt_lower for word in ['canvas', 'screen', 'resolution']):
+            width_match = re.search(r'(\d+).*?(\d+)', prompt)
+            if width_match:
+                width = int(width_match.group(1))
+                height = int(width_match.group(2))
+                patches.extend([
+                    {"op": "replace", "path": "/canvas/width", "value": min(2000, max(100, width))},
+                    {"op": "replace", "path": "/canvas/height", "value": min(2000, max(100, height))}
+                ])
         
         return patches
 
