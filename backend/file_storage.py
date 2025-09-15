@@ -426,7 +426,7 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
-            # For Lottie JSON, generate bulletproof thumbnail
+            # For Lottie JSON, generate simple thumbnail
             elif asset_type == AssetType.LOTTIE_JSON:
                 print(f"🎨 Processing Lottie file: {file_path}")
                 
@@ -435,28 +435,22 @@ class FileStorageManager:
                 if lottie_data:
                     print(f"✅ Lottie data extracted successfully")
                     
-                    # Use bulletproof thumbnail generator
-                    from bulletproof_thumbnail import bulletproof_thumbnail_generator
-                    success = bulletproof_thumbnail_generator.generate_lottie_thumbnail(
-                        lottie_data, thumbnail_path
-                    )
+                    # Create simple thumbnail directly
+                    success = await self._create_simple_lottie_thumbnail(lottie_data, thumbnail_path)
                     
-                    if success and (thumbnail_path.exists() or thumbnail_path.with_suffix('.svg').exists()):
-                        print(f"✅ Bulletproof thumbnail created: {thumbnail_path}")
+                    if success and thumbnail_path.exists():
+                        print(f"✅ Simple thumbnail created: {thumbnail_path}")
                         return f"/uploads/thumbnails/{thumbnail_filename}"
                     else:
-                        print(f"❌ Bulletproof thumbnail creation failed")
+                        print(f"❌ Simple thumbnail creation failed")
                 else:
                     print(f"❌ Failed to extract Lottie data")
                 
-                # Final fallback - create a simple file that indicates thumbnail exists
+                # Final fallback - create a simple colored thumbnail
                 print(f"🔄 Creating final fallback")
                 try:
-                    # Create a simple text file as last resort
-                    fallback_path = thumbnail_path.with_suffix('.txt')
-                    with open(fallback_path, 'w') as f:
-                        f.write("Lottie Animation Thumbnail")
-                    print(f"✅ Fallback file created: {fallback_path}")
+                    await self._create_fallback_thumbnail(thumbnail_path)
+                    print(f"✅ Fallback thumbnail created: {thumbnail_path}")
                     return f"/uploads/thumbnails/{thumbnail_filename}"
                 except Exception as e:
                     print(f"❌ All thumbnail methods failed: {e}")
@@ -699,8 +693,87 @@ class FileStorageManager:
             img = Image.new('RGB', (300, 200), (200, 200, 200))
             img.save(thumbnail_path, 'PNG')
 
-    async def _create_lottie_placeholder(self, thumbnail_path: Path):
-        """Create a simple placeholder thumbnail for Lottie files"""
+    async def _create_simple_lottie_thumbnail(self, lottie_data: Dict[str, Any], thumbnail_path: Path) -> bool:
+        """Create a simple thumbnail for Lottie files"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Get animation dimensions
+            anim_width = lottie_data.get('w', 400)
+            anim_height = lottie_data.get('h', 400)
+            frame_rate = lottie_data.get('fr', 30)
+            duration = (lottie_data.get('op', 60) - lottie_data.get('ip', 0)) / frame_rate
+            layers_count = len(lottie_data.get('layers', []))
+            
+            # Create thumbnail with animation dimensions
+            img = Image.new('RGB', (300, 200), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a gradient background
+            for y in range(200):
+                color_value = int(240 - (y * 0.1))
+                draw.line([(0, y), (300, y)], fill=(color_value, color_value, color_value))
+            
+            # Draw a frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Try to extract colors from the animation
+            colors = []
+            layers = lottie_data.get('layers', [])
+            for layer in layers[:3]:  # Check first 3 layers
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'fl':  # Fill
+                        color_data = shape.get('c', {}).get('k', [0, 0, 0, 1])
+                        if isinstance(color_data, list) and len(color_data) >= 3:
+                            r = int(color_data[0] * 255)
+                            g = int(color_data[1] * 255)
+                            b = int(color_data[2] * 255)
+                            colors.append((r, g, b))
+                            if len(colors) >= 3:
+                                break
+                if len(colors) >= 3:
+                    break
+            
+            # Draw color swatches
+            if colors:
+                for i, color in enumerate(colors[:3]):
+                    x = 50 + (i * 60)
+                    y = 60
+                    draw.rectangle([x, y, x + 40, y + 40], fill=color, outline=(100, 100, 100))
+            
+            # Add text info
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    f"{anim_width}x{anim_height}",
+                    f"{duration:.1f}s @ {frame_rate}fps",
+                    f"{layers_count} layers"
+                ]
+                
+                y_offset = 120
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(80, 80, 80), font=font)
+                    y_offset += 15
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            return True
+            
+        except Exception as e:
+            print(f"Error creating simple Lottie thumbnail: {e}")
+            return False
+
+    async def _create_fallback_thumbnail(self, thumbnail_path: Path) -> bool:
+        """Create a simple fallback thumbnail"""
         try:
             from PIL import Image, ImageDraw, ImageFont
             
@@ -733,12 +806,17 @@ class FileStorageManager:
                 pass
             
             img.save(thumbnail_path, 'PNG')
+            return True
             
         except Exception as e:
-            print(f"Error creating Lottie placeholder: {e}")
+            print(f"Error creating fallback thumbnail: {e}")
             # Create a minimal fallback
-            img = Image.new('RGB', (300, 200), (200, 200, 200))
-            img.save(thumbnail_path, 'PNG')
+            try:
+                img = Image.new('RGB', (300, 200), (200, 200, 200))
+                img.save(thumbnail_path, 'PNG')
+                return True
+            except:
+                return False
 
     async def generate_preview_video(self, file_url: str, asset_type: AssetType) -> Optional[str]:
         """Generate a preview video for the asset"""

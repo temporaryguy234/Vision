@@ -394,9 +394,8 @@ const EditorPage = () => {
       
       // Handle different types of property changes
       if (property.includes('color')) {
-        // Use bulletproof color changing
+        // Try backend color change first, but don't block if it fails
         try {
-          // Send to backend for bulletproof color change
           const response = await fetch('/api/bulletproof/change-color', {
             method: 'POST',
             headers: {

@@ -879,8 +879,6 @@ async def get_stats(db=Depends(get_database)):
 async def bulletproof_change_color(request: Dict[str, Any]):
     """Bulletproof color change endpoint"""
     try:
-        from bulletproof_color_changer import bulletproof_color_changer
-        
         animation_data = request.get('animation_data')
         target_color = request.get('target_color')
         color_type = request.get('color_type', 'fill')
@@ -888,10 +886,31 @@ async def bulletproof_change_color(request: Dict[str, Any]):
         if not animation_data or not target_color:
             raise HTTPException(status_code=400, detail="Missing animation_data or target_color")
         
-        # Change the color
-        modified_data = bulletproof_color_changer.change_color(
-            animation_data, target_color, color_type
-        )
+        # Simple color change implementation
+        modified_data = json.loads(json.dumps(animation_data))  # Deep copy
+        
+        # Convert hex to RGB
+        hex_color = target_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+        
+        if len(hex_color) == 6:
+            r = int(hex_color[0:2], 16) / 255.0
+            g = int(hex_color[2:4], 16) / 255.0
+            b = int(hex_color[4:6], 16) / 255.0
+            normalized_color = [r, g, b, 1.0]
+            
+            # Apply color changes
+            layers = modified_data.get('layers', [])
+            for layer in layers:
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if color_type == 'fill' and shape.get('ty') == 'fl':
+                        if 'c' in shape:
+                            shape['c']['k'] = normalized_color
+                    elif color_type == 'stroke' and shape.get('ty') == 'st':
+                        if 'c' in shape:
+                            shape['c']['k'] = normalized_color
         
         return {
             "success": True,
@@ -900,7 +919,7 @@ async def bulletproof_change_color(request: Dict[str, Any]):
         }
         
     except Exception as e:
-        logger.error(f"Bulletproof color change error: {e}")
+        logger.error(f"Color change error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Include router
