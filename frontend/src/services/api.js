@@ -255,9 +255,16 @@ export const apiService = {
     return response.data;
   },
 
-  // Exports
-  async createExport(exportData) {
-    const response = await api.post('/exports', exportData);
+  // Bulk import
+  async bulkImportUpload(formData) {
+    const response = await api.post('/bulk-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  async bulkImportCreateTemplates(importData) {
+    const response = await api.post('/bulk-import/create-templates', importData);
     return response.data;
   },
 
