@@ -822,7 +822,8 @@ app.include_router(api_router)
 @api_router.post("/bulk-import/upload")
 async def bulk_import_upload(
     files: List[UploadFile] = File(...),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db=Depends(get_database)
 ):
     """Enhanced bulk upload with authentication"""
     if current_user is None:

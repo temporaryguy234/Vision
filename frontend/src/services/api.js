@@ -45,6 +45,19 @@ export const apiService = {
     return response.data;
   },
 
+  // Bulk import
+  async bulkImportUpload(formData) {
+    const response = await api.post('/bulk-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  async bulkImportCreateTemplates(importData) {
+    const response = await api.post('/bulk-import/create-templates', importData);
+    return response.data;
+  },
+
   async put(url, data = {}, config = {}) {
     const response = await api.put(url, data, config);
     return response.data;
