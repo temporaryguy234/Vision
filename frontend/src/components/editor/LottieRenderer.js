@@ -77,19 +77,11 @@ const LottieRenderer = ({
             if (!response.ok) throw new Error(`Failed to load Lottie file: ${response.status}`);
             data = await response.json();
           } else {
-            // For external URLs, try direct fetch first, then proxy
-            try {
-              const response = await fetch(resolvedUrl);
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              data = await response.json();
-            } catch (error) {
-              console.warn('Direct fetch failed, trying proxy:', error.message);
-              // Fallback to proxy for external URLs
-              const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
-              const proxyResp = await fetch(proxyUrl);
-              if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
-              data = await proxyResp.json();
-            }
+            // For external URLs, use backend resolver to support .lottie binary and avoid CORS
+            const resolverUrl = `${backendBase}/api/lottie/resolve?url=${encodeURIComponent(resolvedUrl)}`;
+            const resolverResp = await fetch(resolverUrl);
+            if (!resolverResp.ok) throw new Error(`Failed to resolve external Lottie: ${resolverResp.status}`);
+            data = await resolverResp.json();
           }
         }
 

@@ -478,8 +478,10 @@ async def import_from_url(
         async with aiofiles.open(file_path, 'w') as f:
             await f.write(content)
         
-        # Generate preview
-        preview_url = f"/uploads/previews/{unique_filename}.png"
+        # Generate previews (thumbnail and optional video)
+        saved_file_url = f"/uploads/{unique_filename}"
+        preview_url = await file_storage_manager.generate_thumbnail(saved_file_url, AssetType.LOTTIE_JSON)
+        preview_video_url = await file_storage_manager.generate_preview_video(saved_file_url, AssetType.LOTTIE_JSON)
         
         # Generate proper slug
         base_name = filename_lower.replace('.json', '').replace('.lottie', '')
@@ -495,13 +497,14 @@ async def import_from_url(
             "license": "",
             "author": "",
             "creator_id": current_user.id if current_user else "anonymous",
-            "file_url": f"/uploads/{unique_filename}",
+            "file_url": saved_file_url,
             "preview_url": preview_url,
             "manifest": manifest,
             "category": TemplateCategory.MISCELLANEOUS,
             # Add required fields for Template model compatibility
             "slug": safe_slug,
-            "preview_image_url": preview_url,
+            "preview_image_url": preview_url or "",
+            "preview_video_url": preview_video_url or "",
             "editable_parameters_schema": {
                 "canvas": {"width": 400, "height": 400, "background_color": "#FFFFFF", "global_playback_speed": 1.0},
                 "elements": []
@@ -990,17 +993,31 @@ async def serve_lottie_file(file_path: str):
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
         
-        # Read and return the file content
+        # If it's a .lottie package, extract and return data.json
+        if full_path.suffix.lower() == '.lottie':
+            import zipfile
+            try:
+                with zipfile.ZipFile(full_path, 'r') as zip_file:
+                    if 'data.json' in zip_file.namelist():
+                        with zip_file.open('data.json') as jf:
+                            return json.loads(jf.read().decode('utf-8'))
+                    else:
+                        json_files = [p for p in zip_file.namelist() if p.endswith('.json')]
+                        if json_files:
+                            with zip_file.open(json_files[0]) as jf:
+                                return json.loads(jf.read().decode('utf-8'))
+                        raise HTTPException(status_code=400, detail=".lottie contains no JSON")
+            except Exception as e:
+                logger.error(f"Error reading .lottie {file_path}: {e}")
+                raise HTTPException(status_code=400, detail="Invalid .lottie file")
+
+        # Otherwise treat as JSON file
         with open(full_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
-        # Try to parse as JSON to validate it's a valid Lottie file
         try:
-            json_data = json.loads(content)
+            return json.loads(content)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON file")
-        
-        return json_data
         
     except HTTPException:
         raise
@@ -1081,6 +1098,16 @@ async def lf_import_animation(animation_id: str, current_user: Optional[User] = 
         "category": template.category,
         "file_url": template.file_url
     }
+
+# Resolve remote Lottie (.json or .lottie) into animation JSON via server to avoid CORS and binary parsing in browser
+@api_router.get("/lottie/resolve")
+async def resolve_lottie_url(url: str = Query(..., description="Remote Lottie .json or .lottie URL")):
+    try:
+        animation_data, _ = await lottie_processor.process_url(url)
+        return animation_data
+    except Exception as e:
+        logger.error(f"Resolve Lottie URL failed for {url}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
