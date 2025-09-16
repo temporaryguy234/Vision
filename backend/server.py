@@ -312,16 +312,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MotionEdit API", lifespan=lifespan)
 
-# CORS configuration
+# CORS configuration (env-driven)
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001", 
-        "https://*.vercel.app",
-        "https://*.netlify.app",
-        "https://*.github.io"
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
