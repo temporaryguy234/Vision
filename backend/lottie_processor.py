@@ -44,13 +44,24 @@ class LottieProcessor:
             return {}, {}
     
     async def process_url(self, url: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Process a Lottie file from URL"""
+        """Process a Lottie file from URL with robust fetching and parsing"""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=30.0)
-                response.raise_for_status()
-                animation_data = response.json()
-            
+            headers = {
+                "User-Agent": "MotionEdit/1.0 (+https://example.com)",
+                "Accept": "application/json, text/plain;q=0.9, */*;q=0.8",
+            }
+            timeout = httpx.Timeout(30.0, connect=15.0)
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                # Try strict JSON first
+                try:
+                    animation_data = resp.json()
+                except Exception:
+                    # Some hosts return text/plain JSON
+                    import json as _json
+                    animation_data = _json.loads(resp.text)
+
             manifest = self._generate_manifest(animation_data)
             return animation_data, manifest
         except Exception as e:

@@ -1369,7 +1369,7 @@ async def lf_import_animation(
         "creator_id": current_user.id if current_user else "anonymous",
         "file_url": saved_file_url,
         "preview_url": preview_image_url or "",
-        "manifest": await lottie_processor._generate_manifest(data),
+        "manifest": lottie_processor._generate_manifest(data),
         "category": category or TemplateCategory.MISCELLANEOUS,
         "slug": (name or f"animation-{file_hash}").lower().replace(' ', '-'),
         "preview_image_url": preview_image_url or "",
