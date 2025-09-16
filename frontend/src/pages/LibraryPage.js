@@ -48,6 +48,8 @@ const LibraryPage = () => {
     loadTemplates();
   };
 
+  const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+  const withBackend = (url) => (url && url.startsWith('/uploads/') ? `${backendBase}${url}` : url);
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -134,7 +136,7 @@ const LibraryPage = () => {
                 <div className="aspect-video bg-gradient-to-br from-orange-100 to-red-100 relative group">
                   {(template.preview_url || template.preview_image_url) ? (
                     <img
-                      src={template.preview_url || template.preview_image_url}
+                      src={withBackend(template.preview_url || template.preview_image_url)}
                       alt={template.name || template.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
