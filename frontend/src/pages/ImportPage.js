@@ -490,7 +490,7 @@ const ImportPage = () => {
                       
                       {file.status === 'template_created' && (
                         <button 
-                          onClick={() => window.open(`/editor/${file.template_id}`, '_blank')}
+                          onClick={() => window.open(`/t/${file.template_id}`, '_blank')}
                           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
                         >
                           Edit Template

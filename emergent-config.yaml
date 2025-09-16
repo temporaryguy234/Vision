@@ -21,6 +21,7 @@ services:
     port: 8001
     health_check: "/health"
     environment:
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - MONGO_URL=${MONGO_URL}
       - UPLOADS_DIR=/app/uploads
       - EXPORTS_DIR=/app/exports

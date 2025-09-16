@@ -13,11 +13,30 @@ class LottieProcessor:
         pass
     
     async def process_file(self, file_path: Path) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Process a Lottie file from local path"""
+        """Process a Lottie file from local path (.json or .lottie)"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                animation_data = json.load(f)
-            
+            animation_data: Dict[str, Any] = {}
+            if file_path.suffix.lower() == '.lottie':
+                import zipfile
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zip_file:
+                        # Prefer data.json
+                        if 'data.json' in zip_file.namelist():
+                            with zip_file.open('data.json') as json_file:
+                                animation_data = json.loads(json_file.read().decode('utf-8'))
+                        else:
+                            json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                            if json_files:
+                                with zip_file.open(json_files[0]) as json_file:
+                                    animation_data = json.loads(json_file.read().decode('utf-8'))
+                except zipfile.BadZipFile:
+                    # Fall back to reading as JSON
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        animation_data = json.load(f)
+            else:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    animation_data = json.load(f)
+
             manifest = self._generate_manifest(animation_data)
             return animation_data, manifest
         except Exception as e:

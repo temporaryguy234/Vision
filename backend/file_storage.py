@@ -857,46 +857,48 @@ class FileStorageManager:
             # Read the Lottie JSON file
             with open(file_path, 'r', encoding='utf-8') as f:
                 animation_data = json.load(f)
-            
-            # Get animation duration
-            duration = animation_data.get('op', 0) / animation_data.get('fr', 30)  # frames / fps
-            duration = min(duration, 5)  # Max 5 seconds for preview
-            
-            # Create a simple HTML file to render the Lottie animation
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
-            </head>
-            <body>
-                <div id="lottie-container" style="width: 640px; height: 360px;"></div>
-                <script>
-                    const animation = lottie.loadAnimation({{
-                        container: document.getElementById('lottie-container'),
-                        renderer: 'canvas',
-                        loop: false,
-                        autoplay: true,
-                        animationData: {json.dumps(animation_data)}
-                    }});
-                    
-                    animation.addEventListener('DOMLoaded', () => {{
-                        // Animation is ready
-                        console.log('Animation loaded');
-                    }});
-                </script>
-            </body>
-            </html>
-            """
-            
-            # For now, return empty string as we need a proper headless browser solution
-            # This would require puppeteer or similar to render the HTML and record it
-            print(f"Preview video generation for Lottie not fully implemented yet: {file_path}")
-            return ""
+
+            # Create simple placeholder frames, then encode to WebM
+            temp_dir = file_path.parent / f"preview_frames_{file_path.stem}"
+            temp_dir.mkdir(exist_ok=True)
+
+            frame_rate = int(animation_data.get('fr', 24))
+            frame_rate = max(12, min(frame_rate, 30))
+            total_frames = max(24, min(90, int((animation_data.get('op', 60) - animation_data.get('ip', 0)))))
+
+            for i in range(total_frames):
+                frame_path = temp_dir / f"frame_{i:04d}.png"
+                await self._create_simple_lottie_thumbnail(animation_data, frame_path)
+
+            cmd = [
+                'ffmpeg', '-y',
+                '-framerate', str(frame_rate),
+                '-i', str(temp_dir / 'frame_%04d.png'),
+                '-c:v', 'libvpx-vp9',
+                '-b:v', '0',
+                '-crf', '35',
+                str(preview_path)
+            ]
+
+            result = subprocess.run(cmd, capture_output=True)
+
+            for p in temp_dir.glob('frame_*.png'):
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+            try:
+                temp_dir.rmdir()
+            except Exception:
+                pass
+
+            if result.returncode == 0 and preview_path.exists():
+                return f"/uploads/previews/{preview_path.name}"
+            return None
             
         except Exception as e:
             print(f"Error generating Lottie preview video: {e}")
-            return ""
+            return None
 
 # Global instance
 file_storage = FileStorageManager()
