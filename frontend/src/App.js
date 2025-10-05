@@ -20,6 +20,7 @@ import LoginModal from './components/auth/LoginModal';
 import RegisterModal from './components/auth/RegisterModal';
 import SubscriptionModal from './components/subscription/SubscriptionModal';
 import SubscriptionBanner from './components/subscription/SubscriptionBanner';
+import { useAuth, AuthProvider } from './contexts/AuthContext';
 
 // Import pages
 import LibraryPage from './pages/LibraryPage';
@@ -278,8 +279,6 @@ const HomePage = () => {
               ))
             ) : (
               featuredTemplates.map((template) => {
-                const [hovered, setHovered] = [false, () => {}];
-                const videoRef = { current: null };
                 return (
                   <Link
                     key={template.id}
@@ -357,29 +356,31 @@ const HomePage = () => {
 // Main App Component
 function App() {
   return (
-    <Router>
-      <div className="App">
-        <Routes>
-          {/* Template Editor Route */}
-          <Route path="/t/:templateId" element={<EditorPage />} />
-          
-          {/* Main App Routes with Layout */}
-          <Route path="/*" element={
-            <Layout>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/library" element={<LibraryPage />} />
-                <Route path="/upload" element={<UploadPage />} />
-                <Route path="/projects" element={<MyProjectsPage />} />
-                <Route path="/exports" element={<ExportsPage />} />
-                <Route path="/brand-kits" element={<BrandKitsPage />} />
-                <Route path="/explore" element={<ExplorePage />} />
-              </Routes>
-            </Layout>
-          } />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <Routes>
+            {/* Template Editor Route */}
+            <Route path="/t/:templateId" element={<EditorPage />} />
+            
+            {/* Main App Routes with Layout */}
+            <Route path="/*" element={
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/library" element={<LibraryPage />} />
+                  <Route path="/upload" element={<UploadPage />} />
+                  <Route path="/projects" element={<MyProjectsPage />} />
+                  <Route path="/exports" element={<ExportsPage />} />
+                  <Route path="/brand-kits" element={<BrandKitsPage />} />
+                  <Route path="/explore" element={<ExplorePage />} />
+                </Routes>
+              </Layout>
+            } />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

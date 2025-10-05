@@ -1,0 +1,281 @@
+[
+  {
+    "id": "d532f7d0-0d6d-421a-9373-60ba65647594",
+    "title": "bn9lsinwgh",
+    "slug": "bn9lsinwgh",
+    "category": "Miscellaneous",
+    "tags": [
+      "imported",
+      "lottie"
+    ],
+    "preview_image_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "preview_video_url": "",
+    "supported_aspect_ratios": [
+      "16:9"
+    ],
+    "editable_parameters_schema": {
+      "canvas": {
+        "width": 298,
+        "height": 304,
+        "background_color": "#FFFFFF",
+        "global_playback_speed": 1.0
+      },
+      "elements": []
+    },
+    "creator_id": "anonymous",
+    "version": "1.0.0",
+    "is_public": true,
+    "download_count": 0,
+    "rating": 0.0,
+    "description": "Imported from URL: https://lottie.host/85036dbf-44d5-420d-aa24-325988579179/bN9lsInwGh.json",
+    "source": "url",
+    "license": "",
+    "author": "",
+    "file_url": "/uploads/cc065492_bN9lsInwGh.json",
+    "preview_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "manifest": {
+      "text": [],
+      "images": [],
+      "colors": [
+        {
+          "id": "stroke_2_1",
+          "label": "Shape Layer 2 Stroke",
+          "selector": "layers[2].shapes[1].c.k",
+          "default": "#000000"
+        },
+        {
+          "id": "fill_3_1",
+          "label": "Shape Layer 1 Fill",
+          "selector": "layers[3].shapes[1].c.k",
+          "default": "#00ddb3"
+        }
+      ],
+      "chart": [],
+      "speed": {
+        "min": 0.2,
+        "max": 3.0,
+        "default": 1.0
+      },
+      "anchors": [
+        {
+          "id": "top_left",
+          "label": "Top Left",
+          "x": 0.1,
+          "y": 0.1
+        },
+        {
+          "id": "top_right",
+          "label": "Top Right",
+          "x": 0.9,
+          "y": 0.1
+        },
+        {
+          "id": "bottom_left",
+          "label": "Bottom Left",
+          "x": 0.1,
+          "y": 0.9
+        },
+        {
+          "id": "bottom_right",
+          "label": "Bottom Right",
+          "x": 0.9,
+          "y": 0.9
+        },
+        {
+          "id": "center",
+          "label": "Center",
+          "x": 0.5,
+          "y": 0.5
+        }
+      ]
+    },
+    "created_at": "2025-09-15T13:42:53.934469",
+    "updated_at": "2025-09-15T13:42:53.934474"
+  },
+  {
+    "id": "77699771-e2fd-4c84-8eb4-04df4692968a",
+    "title": "bn9lsinwgh",
+    "slug": "bn9lsinwgh",
+    "category": "Miscellaneous",
+    "tags": [
+      "imported",
+      "lottie"
+    ],
+    "preview_image_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "preview_video_url": "",
+    "supported_aspect_ratios": [
+      "16:9"
+    ],
+    "editable_parameters_schema": {
+      "canvas": {
+        "width": 298,
+        "height": 304,
+        "background_color": "#FFFFFF",
+        "global_playback_speed": 1.0
+      },
+      "elements": []
+    },
+    "creator_id": "anonymous",
+    "version": "1.0.0",
+    "is_public": true,
+    "download_count": 0,
+    "rating": 0.0,
+    "description": "Imported from URL: https://lottie.host/85036dbf-44d5-420d-aa24-325988579179/bN9lsInwGh.json",
+    "source": "url",
+    "license": "",
+    "author": "",
+    "file_url": "/uploads/cc065492_bN9lsInwGh.json",
+    "preview_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "manifest": {
+      "text": [],
+      "images": [],
+      "colors": [
+        {
+          "id": "stroke_2_1",
+          "label": "Shape Layer 2 Stroke",
+          "selector": "layers[2].shapes[1].c.k",
+          "default": "#000000"
+        },
+        {
+          "id": "fill_3_1",
+          "label": "Shape Layer 1 Fill",
+          "selector": "layers[3].shapes[1].c.k",
+          "default": "#00ddb3"
+        }
+      ],
+      "chart": [],
+      "speed": {
+        "min": 0.2,
+        "max": 3.0,
+        "default": 1.0
+      },
+      "anchors": [
+        {
+          "id": "top_left",
+          "label": "Top Left",
+          "x": 0.1,
+          "y": 0.1
+        },
+        {
+          "id": "top_right",
+          "label": "Top Right",
+          "x": 0.9,
+          "y": 0.1
+        },
+        {
+          "id": "bottom_left",
+          "label": "Bottom Left",
+          "x": 0.1,
+          "y": 0.9
+        },
+        {
+          "id": "bottom_right",
+          "label": "Bottom Right",
+          "x": 0.9,
+          "y": 0.9
+        },
+        {
+          "id": "center",
+          "label": "Center",
+          "x": 0.5,
+          "y": 0.5
+        }
+      ]
+    },
+    "created_at": "2025-09-15T14:38:27.656547",
+    "updated_at": "2025-09-15T14:38:27.656551"
+  },
+  {
+    "id": "1479f23d-7035-41a0-83e2-cf30bc7075cc",
+    "title": "bn9lsinwgh",
+    "slug": "bn9lsinwgh",
+    "category": "Miscellaneous",
+    "tags": [
+      "imported",
+      "lottie"
+    ],
+    "preview_image_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "preview_video_url": "",
+    "supported_aspect_ratios": [
+      "16:9"
+    ],
+    "editable_parameters_schema": {
+      "canvas": {
+        "width": 298,
+        "height": 304,
+        "background_color": "#FFFFFF",
+        "global_playback_speed": 1.0
+      },
+      "elements": []
+    },
+    "creator_id": "anonymous",
+    "version": "1.0.0",
+    "is_public": true,
+    "download_count": 0,
+    "rating": 0.0,
+    "description": "Imported from URL: https://lottie.host/85036dbf-44d5-420d-aa24-325988579179/bN9lsInwGh.json",
+    "source": "url",
+    "license": "",
+    "author": "",
+    "file_url": "/uploads/cc065492_bN9lsInwGh.json",
+    "preview_url": "/uploads/thumbnails/cc065492_bN9lsInwGh_thumb.png",
+    "manifest": {
+      "text": [],
+      "images": [],
+      "colors": [
+        {
+          "id": "stroke_2_1",
+          "label": "Shape Layer 2 Stroke",
+          "selector": "layers[2].shapes[1].c.k",
+          "default": "#000000"
+        },
+        {
+          "id": "fill_3_1",
+          "label": "Shape Layer 1 Fill",
+          "selector": "layers[3].shapes[1].c.k",
+          "default": "#00ddb3"
+        }
+      ],
+      "chart": [],
+      "speed": {
+        "min": 0.2,
+        "max": 3.0,
+        "default": 1.0
+      },
+      "anchors": [
+        {
+          "id": "top_left",
+          "label": "Top Left",
+          "x": 0.1,
+          "y": 0.1
+        },
+        {
+          "id": "top_right",
+          "label": "Top Right",
+          "x": 0.9,
+          "y": 0.1
+        },
+        {
+          "id": "bottom_left",
+          "label": "Bottom Left",
+          "x": 0.1,
+          "y": 0.9
+        },
+        {
+          "id": "bottom_right",
+          "label": "Bottom Right",
+          "x": 0.9,
+          "y": 0.9
+        },
+        {
+          "id": "center",
+          "label": "Center",
+          "x": 0.5,
+          "y": 0.5
+        }
+      ]
+    },
+    "created_at": "2025-09-15T18:36:54.445079",
+    "updated_at": "2025-09-15T18:36:54.445082"
+  }
+]

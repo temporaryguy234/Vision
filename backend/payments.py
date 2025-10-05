@@ -7,6 +7,16 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
+# Import SubscriptionPlan from subscription module
+try:
+    from subscription import SubscriptionPlan
+except ImportError:
+    # Fallback for when subscription module is not available
+    class SubscriptionPlan:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
 # Stripe Configuration
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')

@@ -48,6 +48,8 @@ const TemplatesPage = () => {
     fetchTemplates();
   }, [selectedCategory, searchQuery]);
 
+  const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+  const withBackend = (url) => (url && url.startsWith('/uploads/') ? `${backendBase}${url}` : url);
   const filteredTemplates = templates;
 
   const TemplateCard = ({ template }) => {
@@ -79,7 +81,7 @@ const TemplatesPage = () => {
           {/* Base thumbnail image */}
           {template.preview_image_url || template.preview_url ? (
             <img
-              src={template.preview_image_url || template.preview_url}
+              src={withBackend(template.preview_image_url || template.preview_url)}
               alt={template.title}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -92,7 +94,7 @@ const TemplatesPage = () => {
           {template.preview_video_url ? (
             <video
               ref={videoRef}
-              src={template.preview_video_url}
+              src={withBackend(template.preview_video_url)}
               className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               muted
               loop

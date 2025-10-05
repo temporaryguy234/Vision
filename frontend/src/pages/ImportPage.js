@@ -43,10 +43,10 @@ const ImportPage = () => {
       files.forEach(file => {
         formData.append('files', file);
       });
-      
+
       // Upload files
       const response = await apiService.bulkImportUpload(formData);
-      
+
       // Process results
       const processedFiles = response.results.map((result, index) => ({
         id: Date.now() + index,
@@ -71,6 +71,11 @@ const ImportPage = () => {
       }
       
     } catch (error) {
+      if (error.response?.status === 401) {
+        alert('Please log in to upload files.');
+        window.location.href = '/';
+        return;
+      }
       console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
     } finally {
@@ -485,7 +490,7 @@ const ImportPage = () => {
                       
                       {file.status === 'template_created' && (
                         <button 
-                          onClick={() => window.open(`/editor/${file.template_id}`, '_blank')}
+                          onClick={() => window.open(`/t/${file.template_id}`, '_blank')}
                           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
                         >
                           Edit Template

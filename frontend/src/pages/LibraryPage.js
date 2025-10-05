@@ -48,6 +48,8 @@ const LibraryPage = () => {
     loadTemplates();
   };
 
+  const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+  const withBackend = (url) => (url && url.startsWith('/uploads/') ? `${backendBase}${url}` : url);
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -132,17 +134,20 @@ const LibraryPage = () => {
                 
                 {/* Preview */}
                 <div className="aspect-video bg-gradient-to-br from-orange-100 to-red-100 relative group">
-                  {template.preview_url ? (
+                  {(template.preview_url || template.preview_image_url) ? (
                     <img
-                      src={template.preview_url}
-                      alt={template.name}
+                      src={withBackend(template.preview_url || template.preview_image_url)}
+                      alt={template.name || template.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Play className="w-12 h-12 text-orange-500" />
-                    </div>
-                  )}
+                  ) : null}
+                  <div className="w-full h-full flex items-center justify-center" style={{display: (template.preview_url || template.preview_image_url) ? 'none' : 'flex'}}>
+                    <Play className="w-12 h-12 text-orange-500" />
+                  </div>
                   
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
@@ -161,7 +166,7 @@ const LibraryPage = () => {
                 {/* Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-1 truncate">
-                    {template.name}
+                    {template.name || template.title}
                   </h3>
                   
                   {template.description && (

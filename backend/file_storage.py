@@ -16,6 +16,9 @@ class FileStorageManager:
         self.base_upload_dir = Path(base_upload_dir)
         self.base_upload_dir.mkdir(exist_ok=True, parents=True)
         
+        # Ensure all subdirectories exist
+        self._ensure_directories()
+        
         # Create subdirectories for different asset types
         self.subdirs = {
             AssetType.LOTTIE_JSON: self.base_upload_dir / "lottie",
@@ -28,6 +31,21 @@ class FileStorageManager:
         
         for subdir in self.subdirs.values():
             subdir.mkdir(exist_ok=True, parents=True)
+    
+    def _ensure_directories(self):
+        """Ensure all required directories exist"""
+        required_dirs = [
+            self.base_upload_dir / "thumbnails",
+            self.base_upload_dir / "previews",
+            self.base_upload_dir / "lottie",
+            self.base_upload_dir / "images" / "png",
+            self.base_upload_dir / "images" / "gif",
+            self.base_upload_dir / "videos" / "mp4",
+            self.base_upload_dir / "videos" / "webm",
+        ]
+        
+        for dir_path in required_dirs:
+            dir_path.mkdir(exist_ok=True, parents=True)
     
     def _get_asset_type_from_file(self, filename: str, content_type: str) -> Optional[AssetType]:
         """Determine asset type from filename and content type"""
@@ -364,9 +382,15 @@ class FileStorageManager:
     
     async def generate_thumbnail(self, file_url: str, asset_type: AssetType) -> Optional[str]:
         """Generate a thumbnail for the asset"""
+        print(f"🔍 Generating thumbnail for: {file_url}, type: {asset_type}")
+        
         file_path = self.get_file_path(file_url)
         if not file_path:
+            print(f"❌ File path not found for: {file_url}")
             return None
+        
+        print(f"📁 File path: {file_path}")
+        print(f"📁 File exists: {file_path.exists()}")
         
         thumbnail_dir = self.base_upload_dir / "thumbnails"
         thumbnail_dir.mkdir(exist_ok=True)
@@ -374,6 +398,8 @@ class FileStorageManager:
         # Generate thumbnail filename
         thumbnail_filename = f"{file_path.stem}_thumb.png"
         thumbnail_path = thumbnail_dir / thumbnail_filename
+        
+        print(f"📁 Thumbnail path: {thumbnail_path}")
         
         try:
             if asset_type in [AssetType.MP4, AssetType.WEBM_ALPHA]:
@@ -400,14 +426,478 @@ class FileStorageManager:
                     
                     return f"/uploads/thumbnails/{thumbnail_filename}"
             
-            # For Lottie JSON, return a neutral placeholder to avoid broken UI
-            if asset_type == AssetType.LOTTIE_JSON:
-                return "/uploads/thumbnails/lottie_placeholder.svg"
+            # For Lottie JSON, generate simple thumbnail
+            elif asset_type == AssetType.LOTTIE_JSON:
+                print(f"🎨 Processing Lottie file: {file_path}")
+                
+                # Extract Lottie data
+                lottie_data = await self._extract_lottie_data(file_path)
+                if lottie_data:
+                    print(f"✅ Lottie data extracted successfully")
+                    
+                    # Create simple thumbnail directly
+                    success = await self._create_simple_lottie_thumbnail(lottie_data, thumbnail_path)
+                    
+                    if success and thumbnail_path.exists():
+                        print(f"✅ Simple thumbnail created: {thumbnail_path}")
+                        return f"/uploads/thumbnails/{thumbnail_filename}"
+                    else:
+                        print(f"❌ Simple thumbnail creation failed")
+                else:
+                    print(f"❌ Failed to extract Lottie data")
+                
+                # Final fallback - create a simple colored thumbnail
+                print(f"🔄 Creating final fallback")
+                try:
+                    await self._create_fallback_thumbnail(thumbnail_path)
+                    print(f"✅ Fallback thumbnail created: {thumbnail_path}")
+                    return f"/uploads/thumbnails/{thumbnail_filename}"
+                except Exception as e:
+                    print(f"❌ All thumbnail methods failed: {e}")
             # For other types, we might return a default thumbnail or None
             return None
             
         except Exception as e:
             print(f"Error generating thumbnail: {e}")
+            return None
+    
+    async def _extract_lottie_data(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """Extract Lottie animation data from file"""
+        try:
+            import zipfile
+            
+            # Check if it's a .lottie file (ZIP format)
+            if file_path.suffix.lower() == '.lottie':
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zip_file:
+                        # Look for data.json in the ZIP
+                        if 'data.json' in zip_file.namelist():
+                            with zip_file.open('data.json') as json_file:
+                                content = json_file.read().decode('utf-8')
+                                return json.loads(content)
+                        else:
+                            # Some .lottie files might have the JSON at root level
+                            json_files = [f for f in zip_file.namelist() if f.endswith('.json')]
+                            if json_files:
+                                with zip_file.open(json_files[0]) as json_file:
+                                    content = json_file.read().decode('utf-8')
+                                    return json.loads(content)
+                except zipfile.BadZipFile:
+                    # If it's not a valid ZIP, treat as regular JSON
+                    async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                        return json.loads(content)
+            else:
+                # Regular JSON file
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    return json.loads(content)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error extracting Lottie data: {e}")
+            return None
+
+    async def _generate_lottie_thumbnail(self, file_path: Path, thumbnail_path: Path) -> Optional[str]:
+        """Generate a thumbnail for Lottie animation using lottie-web"""
+        try:
+            # Read the Lottie JSON file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                animation_data = json.load(f)
+            
+            # Create a simple HTML file to render the Lottie animation
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+            </head>
+            <body>
+                <div id="lottie-container" style="width: 300px; height: 200px;"></div>
+                <script>
+                    const animation = lottie.loadAnimation({{
+                        container: document.getElementById('lottie-container'),
+                        renderer: 'canvas',
+                        loop: false,
+                        autoplay: false,
+                        animationData: {json.dumps(animation_data)}
+                    }});
+                    
+                    animation.addEventListener('DOMLoaded', () => {{
+                        // Wait a bit for the animation to render
+                        setTimeout(() => {{
+                            const canvas = document.querySelector('canvas');
+                            if (canvas) {{
+                                // Convert canvas to image and send to parent
+                                const dataURL = canvas.toDataURL('image/png');
+                                window.parent.postMessage({{type: 'thumbnail', data: dataURL}}, '*');
+                            }}
+                        }}, 100);
+                    }});
+                </script>
+            </body>
+            </html>
+            """
+            
+            # For now, create a simple colored thumbnail based on animation properties
+            # This is a fallback until we implement proper Lottie rendering
+            width = animation_data.get('w', 1920)
+            height = animation_data.get('h', 1080)
+            
+            # Create a simple thumbnail with animation info
+            img = Image.new('RGB', (300, 200), color='#f0f0f0')
+            
+            # Try to get a color from the animation
+            bg_color = self._extract_background_color(animation_data)
+            if bg_color:
+                img = Image.new('RGB', (300, 200), color=bg_color)
+            
+            # Add some text overlay
+            from PIL import ImageDraw, ImageFont
+            draw = ImageDraw.Draw(img)
+            
+            try:
+                # Try to use a default font
+                font = ImageFont.load_default()
+            except:
+                font = None
+            
+            # Draw animation info
+            text_lines = [
+                f"Lottie Animation",
+                f"{width}x{height}",
+                f"{len(animation_data.get('layers', []))} layers"
+            ]
+            
+            y_offset = 50
+            for line in text_lines:
+                draw.text((10, y_offset), line, fill='#333333', font=font)
+                y_offset += 25
+            
+            # Save thumbnail
+            img.save(thumbnail_path, "PNG")
+            return f"/uploads/thumbnails/{thumbnail_path.name}"
+            
+        except Exception as e:
+            print(f"Error generating Lottie thumbnail: {e}")
+            # Return placeholder as fallback
+            return "/uploads/thumbnails/lottie_placeholder.svg"
+    
+    def _extract_background_color(self, animation_data: Dict) -> Optional[str]:
+        """Extract background color from Lottie animation data"""
+        try:
+            # Look for background color in layers
+            layers = animation_data.get('layers', [])
+            for layer in layers:
+                if layer.get('ty') == 1:  # Solid layer
+                    sc = layer.get('sc', '')
+                    if sc:
+                        # Convert color to hex
+                        if isinstance(sc, str) and sc.startswith('#'):
+                            return sc
+                        elif isinstance(sc, list) and len(sc) >= 3:
+                            r, g, b = int(sc[0] * 255), int(sc[1] * 255), int(sc[2] * 255)
+                            return f"#{r:02x}{g:02x}{b:02x}"
+            
+            # Look for background in composition
+            bg_color = animation_data.get('bg')
+            if bg_color:
+                if isinstance(bg_color, str) and bg_color.startswith('#'):
+                    return bg_color
+                elif isinstance(bg_color, list) and len(bg_color) >= 3:
+                    r, g, b = int(bg_color[0] * 255), int(bg_color[1] * 255), int(bg_color[2] * 255)
+                    return f"#{r:02x}{g:02x}{b:02x}"
+            
+            return None
+        except:
+            return None
+
+    async def _create_lottie_thumbnail(self, lottie_data: Dict[str, Any], thumbnail_path: Path):
+        """Create a simple but effective thumbnail for Lottie files"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Get animation dimensions
+            anim_width = lottie_data.get('w', 400)
+            anim_height = lottie_data.get('h', 400)
+            frame_rate = lottie_data.get('fr', 30)
+            duration = (lottie_data.get('op', 60) - lottie_data.get('ip', 0)) / frame_rate
+            layers_count = len(lottie_data.get('layers', []))
+            
+            # Create thumbnail with animation dimensions
+            img = Image.new('RGB', (300, 200), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a gradient background
+            for y in range(200):
+                color_value = int(240 - (y * 0.1))
+                draw.line([(0, y), (300, y)], fill=(color_value, color_value, color_value))
+            
+            # Draw a frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Try to extract colors from the animation
+            colors = []
+            layers = lottie_data.get('layers', [])
+            for layer in layers[:3]:  # Check first 3 layers
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'fl':  # Fill
+                        color_data = shape.get('c', {}).get('k', [0, 0, 0, 1])
+                        if isinstance(color_data, list) and len(color_data) >= 3:
+                            r = int(color_data[0] * 255)
+                            g = int(color_data[1] * 255)
+                            b = int(color_data[2] * 255)
+                            colors.append((r, g, b))
+                            if len(colors) >= 3:
+                                break
+                if len(colors) >= 3:
+                    break
+            
+            # Draw color swatches
+            if colors:
+                for i, color in enumerate(colors[:3]):
+                    x = 50 + (i * 60)
+                    y = 60
+                    draw.rectangle([x, y, x + 40, y + 40], fill=color, outline=(100, 100, 100))
+            
+            # Add text info
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    f"{anim_width}x{anim_height}",
+                    f"{duration:.1f}s @ {frame_rate}fps",
+                    f"{layers_count} layers"
+                ]
+                
+                y_offset = 120
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(80, 80, 80), font=font)
+                    y_offset += 15
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            
+        except Exception as e:
+            print(f"Error creating Lottie thumbnail: {e}")
+            # Create a minimal fallback
+            img = Image.new('RGB', (300, 200), (200, 200, 200))
+            img.save(thumbnail_path, 'PNG')
+
+    async def _create_simple_lottie_thumbnail(self, lottie_data: Dict[str, Any], thumbnail_path: Path) -> bool:
+        """Create a simple thumbnail for Lottie files"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Get animation dimensions
+            anim_width = lottie_data.get('w', 400)
+            anim_height = lottie_data.get('h', 400)
+            frame_rate = lottie_data.get('fr', 30)
+            duration = (lottie_data.get('op', 60) - lottie_data.get('ip', 0)) / frame_rate
+            layers_count = len(lottie_data.get('layers', []))
+            
+            # Create thumbnail with animation dimensions
+            img = Image.new('RGB', (300, 200), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a gradient background
+            for y in range(200):
+                color_value = int(240 - (y * 0.1))
+                draw.line([(0, y), (300, y)], fill=(color_value, color_value, color_value))
+            
+            # Draw a frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Try to extract colors from the animation
+            colors = []
+            layers = lottie_data.get('layers', [])
+            for layer in layers[:3]:  # Check first 3 layers
+                shapes = layer.get('shapes', [])
+                for shape in shapes:
+                    if shape.get('ty') == 'fl':  # Fill
+                        color_data = shape.get('c', {}).get('k', [0, 0, 0, 1])
+                        if isinstance(color_data, list) and len(color_data) >= 3:
+                            r = int(color_data[0] * 255)
+                            g = int(color_data[1] * 255)
+                            b = int(color_data[2] * 255)
+                            colors.append((r, g, b))
+                            if len(colors) >= 3:
+                                break
+                if len(colors) >= 3:
+                    break
+            
+            # Draw color swatches
+            if colors:
+                for i, color in enumerate(colors[:3]):
+                    x = 50 + (i * 60)
+                    y = 60
+                    draw.rectangle([x, y, x + 40, y + 40], fill=color, outline=(100, 100, 100))
+            
+            # Add text info
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    f"{anim_width}x{anim_height}",
+                    f"{duration:.1f}s @ {frame_rate}fps",
+                    f"{layers_count} layers"
+                ]
+                
+                y_offset = 120
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(80, 80, 80), font=font)
+                    y_offset += 15
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            return True
+            
+        except Exception as e:
+            print(f"Error creating simple Lottie thumbnail: {e}")
+            return False
+
+    async def _create_fallback_thumbnail(self, thumbnail_path: Path) -> bool:
+        """Create a simple fallback thumbnail"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Create a simple placeholder image
+            img = Image.new('RGB', (300, 200), (240, 240, 240))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw a simple frame
+            draw.rectangle([10, 10, 290, 190], outline=(200, 200, 200), width=2)
+            
+            # Add text
+            try:
+                font = ImageFont.load_default()
+                text_lines = [
+                    "Lottie Animation",
+                    "Thumbnail Preview"
+                ]
+                
+                y_offset = 80
+                for line in text_lines:
+                    # Center the text
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (300 - text_width) // 2
+                    draw.text((x, y_offset), line, fill=(100, 100, 100), font=font)
+                    y_offset += 25
+                    
+            except Exception:
+                # If font loading fails, just draw without text
+                pass
+            
+            img.save(thumbnail_path, 'PNG')
+            return True
+            
+        except Exception as e:
+            print(f"Error creating fallback thumbnail: {e}")
+            # Create a minimal fallback
+            try:
+                img = Image.new('RGB', (300, 200), (200, 200, 200))
+                img.save(thumbnail_path, 'PNG')
+                return True
+            except:
+                return False
+
+    async def generate_preview_video(self, file_url: str, asset_type: AssetType) -> Optional[str]:
+        """Generate a preview video for the asset"""
+        file_path = self.get_file_path(file_url)
+        if not file_path:
+            return None
+        
+        preview_dir = self.base_upload_dir / "previews"
+        preview_dir.mkdir(exist_ok=True)
+        
+        # Generate preview video filename
+        preview_filename = f"{file_path.stem}_preview.webm"
+        preview_path = preview_dir / preview_filename
+        
+        try:
+            if asset_type == AssetType.LOTTIE_JSON:
+                return await self._generate_lottie_preview_video(file_path, preview_path)
+            elif asset_type in [AssetType.MP4, AssetType.WEBM_ALPHA]:
+                # For video files, create a shorter preview
+                cmd = [
+                    'ffmpeg', '-i', str(file_path), '-t', '3', '-c:v', 'libvpx-vp9',
+                    '-crf', '30', '-b:v', '0', '-y', str(preview_path)
+                ]
+                result = subprocess.run(cmd, capture_output=True)
+                
+                if result.returncode == 0 and preview_path.exists():
+                    return f"/uploads/previews/{preview_filename}"
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error generating preview video: {e}")
+            return None
+
+    async def _generate_lottie_preview_video(self, file_path: Path, preview_path: Path) -> Optional[str]:
+        """Generate a preview video for Lottie animation"""
+        try:
+            # Read the Lottie JSON file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                animation_data = json.load(f)
+
+            # Create simple placeholder frames, then encode to WebM
+            temp_dir = file_path.parent / f"preview_frames_{file_path.stem}"
+            temp_dir.mkdir(exist_ok=True)
+
+            frame_rate = int(animation_data.get('fr', 24))
+            frame_rate = max(12, min(frame_rate, 30))
+            total_frames = max(24, min(90, int((animation_data.get('op', 60) - animation_data.get('ip', 0)))))
+
+            for i in range(total_frames):
+                frame_path = temp_dir / f"frame_{i:04d}.png"
+                await self._create_simple_lottie_thumbnail(animation_data, frame_path)
+
+            cmd = [
+                'ffmpeg', '-y',
+                '-framerate', str(frame_rate),
+                '-i', str(temp_dir / 'frame_%04d.png'),
+                '-c:v', 'libvpx-vp9',
+                '-b:v', '0',
+                '-crf', '35',
+                str(preview_path)
+            ]
+
+            result = subprocess.run(cmd, capture_output=True)
+
+            for p in temp_dir.glob('frame_*.png'):
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+            try:
+                temp_dir.rmdir()
+            except Exception:
+                pass
+
+            if result.returncode == 0 and preview_path.exists():
+                return f"/uploads/previews/{preview_path.name}"
+            return None
+            
+        except Exception as e:
+            print(f"Error generating Lottie preview video: {e}")
             return None
 
 # Global instance

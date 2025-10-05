@@ -5,6 +5,16 @@ from pydantic import BaseModel
 from fastapi import HTTPException, status
 import uuid
 
+# Import User from auth module
+try:
+    from auth import User
+except ImportError:
+    # Fallback for when auth module is not available
+    class User:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
 class SubscriptionTier(str, Enum):
     FREE = "free"
     MID = "mid"

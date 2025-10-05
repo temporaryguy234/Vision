@@ -104,7 +104,8 @@ const PropertiesPanel = ({
   
   // Handle property change with validation
   const handlePropertyChange = useCallback((elementId, property, value) => {
-    const element = template?.editable_parameters_schema.elements.find(e => e.id === elementId);
+    const element = template?.editable_parameters_schema?.elements?.find(e => e.id === elementId) ||
+                   template?.manifest?.elements?.find(e => e.id === elementId);
     if (!element) return;
     
     const error = validateProperty(element, property, value);
@@ -114,19 +115,19 @@ const PropertiesPanel = ({
       return;
     }
     
-    const oldValue = editorState.elements[elementId]?.[property] || element.parameters[property];
+    const oldValue = editorState.elements[elementId]?.[property] || element.parameters?.[property] || element.defaults?.[property];
     onPropertyChange(elementId, property, value, oldValue);
   }, [template, editorState, onPropertyChange]);
   
   // Handle canvas property change
   const handleCanvasPropertyChange = useCallback((property, value) => {
-    const oldValue = editorState.canvas?.[property] || template?.editable_parameters_schema.canvas[property];
+    const oldValue = editorState.canvas?.[property] || template?.editable_parameters_schema?.canvas?.[property];
     onCanvasChange(property, value, oldValue);
   }, [editorState, template, onCanvasChange]);
   
   // Render property input
   const renderPropertyInput = (element, property, label, type = 'text', options = {}) => {
-    const currentValue = editorState.elements[element.id]?.[property] || element.parameters[property];
+    const currentValue = editorState.elements[element.id]?.[property] || element.parameters?.[property] || element.defaults?.[property];
     const elementId = element.id;
     
     const inputProps = {
@@ -548,7 +549,9 @@ const PropertiesPanel = ({
             {expandedSections.elements && (
               <div className="px-4 pb-4">
                 {selectedElements.map(elementId => {
-                  const element = template?.editable_parameters_schema.elements.find(e => e.id === elementId);
+                  // Look for element in both editable_parameters_schema and manifest
+                  const element = template?.editable_parameters_schema?.elements?.find(e => e.id === elementId) ||
+                                 template?.manifest?.elements?.find(e => e.id === elementId);
                   if (!element) return null;
                   
                   const Icon = getElementIcon(element.type);

@@ -39,7 +39,7 @@ const LottieRenderer = ({
   const [error, setError] = React.useState(null);
 
   useEffect(() => {
-    const backendBase = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+    const backendBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
     // If external data is provided, use it directly
     if (externalAnimationData) {
@@ -67,14 +67,30 @@ const LottieRenderer = ({
           const response = await fetch(`${backendBase}/api/lottiefiles/animation/${animationId}/data`);
           if (!response.ok) throw new Error(`Failed to load embedded animation: ${response.status}`);
           data = await response.json();
-        } else if (sourceUrl.startsWith('/uploads/')) {
-          const response = await fetch(`${backendBase}${sourceUrl}`);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
         } else {
-          const response = await fetch(sourceUrl);
-          if (!response.ok) throw new Error(`Failed to load animation: ${response.status}`);
-          data = await response.json();
+          let resolvedUrl = sourceUrl;
+          if (resolvedUrl.startsWith('/uploads/')) {
+            // Use the new direct Lottie endpoint for uploads
+            const filePath = resolvedUrl.replace('/uploads/', '');
+            const lottieUrl = `${backendBase}/api/lottie/${filePath}`;
+            const response = await fetch(lottieUrl);
+            if (!response.ok) throw new Error(`Failed to load Lottie file: ${response.status}`);
+            data = await response.json();
+          } else {
+            // For external URLs, try direct fetch first, then proxy
+            try {
+              const response = await fetch(resolvedUrl);
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              data = await response.json();
+            } catch (error) {
+              console.warn('Direct fetch failed, trying proxy:', error.message);
+              // Fallback to proxy for external URLs
+              const proxyUrl = `${backendBase}/api/proxy/fetch-json?url=${encodeURIComponent(resolvedUrl)}`;
+              const proxyResp = await fetch(proxyUrl);
+              if (!proxyResp.ok) throw new Error(`Failed to load animation via proxy: ${proxyResp.status}`);
+              data = await proxyResp.json();
+            }
+          }
         }
 
         setAnimationData(data);
@@ -104,16 +120,53 @@ const LottieRenderer = ({
   if (error || !animationData) {
     return (
       <div 
-        className={`w-24 h-24 border-2 border-dashed border-red-300 bg-red-50 flex flex-col items-center justify-center rounded ${className} ${isSelected ? 'ring-2 ring-orange-500' : ''}`}
+        className={`inline-block ${className} ${isSelected ? 'ring-2 ring-orange-500 rounded' : ''}`}
         onClick={onClick}
         onMouseDown={onDragStart}
+        style={{ 
+          width: '100%',
+          height: '100%',
+          minWidth: '150px',
+          minHeight: '150px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f8f9fa',
+          border: '2px solid #e9ecef',
+          borderRadius: '8px',
+          position: 'relative'
+        }}
       >
-        <span className="text-red-500 text-xs text-center">
-          Lottie Error
-        </span>
-        <span className="text-red-400 text-xs text-center mt-1">
-          {error || 'Failed to load'}
-        </span>
+        {/* Enhanced fallback with animation preview */}
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-2 relative">
+            <div className="absolute inset-0 border-4 border-orange-200 rounded-full animate-spin"></div>
+            <div className="absolute inset-2 border-4 border-orange-500 rounded-full animate-pulse"></div>
+          </div>
+          <div className="text-sm font-medium text-gray-700">Motion Graphic</div>
+          <div className="text-xs text-gray-500 mt-1">
+            {animationData ? `${animationData.w || 0}×${animationData.h || 0}` : 'Preview'}
+          </div>
+          {animationData?.layers && (
+            <div className="text-xs text-gray-400 mt-1">
+              {animationData.layers.length} layers
+            </div>
+          )}
+          {error && (
+            <div className="text-xs text-red-500 mt-2 px-2 py-1 bg-red-50 rounded">
+              {error}
+            </div>
+          )}
+        </div>
+        
+        {/* Play button overlay */}
+        {!isPlaying && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
+            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg">
+              <div className="w-0 h-0 border-l-4 border-l-orange-500 border-t-3 border-t-transparent border-b-3 border-b-transparent ml-1"></div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -123,7 +176,12 @@ const LottieRenderer = ({
       className={`inline-block ${className} ${isSelected ? 'ring-2 ring-orange-500 rounded' : ''}`}
       onClick={onClick}
       onMouseDown={onDragStart}
-      style={{ width: '96px', height: '96px' }}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        minWidth: '150px',
+        minHeight: '150px'
+      }}
     >
       <Lottie
         lottieRef={lottieRef}
